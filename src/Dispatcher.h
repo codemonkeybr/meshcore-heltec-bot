@@ -39,6 +39,13 @@ public:
   virtual float packetScore(float snr, int packet_len) = 0;
 
   /**
+   * \returns  count of packet receive errors (e.g. CRC failures), or -1 if this
+   *           radio implementation doesn't track them. Optional - default is
+   *           "unknown" rather than a fabricated zero.
+  */
+  virtual int getPacketsRecvErrors() { return -1; }
+
+  /**
    * \brief  starts the raw packet send. (no wait)
    * \param  bytes   the raw packet data
    * \param  len  the length in bytes
@@ -187,6 +194,7 @@ public:
   uint32_t getNumSentDirect() const { return n_sent_direct; }
   uint32_t getNumRecvFlood() const { return n_recv_flood; }
   uint32_t getNumRecvDirect() const { return n_recv_direct; }
+  uint16_t getErrFlags() const { return _err_flags; }
   void resetStats() {
     n_sent_flood = n_sent_direct = n_recv_flood = n_recv_direct = 0;
     _err_flags = 0;
