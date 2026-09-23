@@ -6,6 +6,7 @@
 #include "BotStore.h"
 #include "BotMsg.h"
 #include "ReplyTarget.h"
+#include "BotObserverMqtt.h"
 
 // BotMesh extends the stock companion-radio MyMesh with an on-device command
 // engine. It is substituted for `the_mesh` via -D MESH_CLASS=BotMesh /
@@ -59,6 +60,8 @@ protected:
   void onDiscoveredContact(ContactInfo& contact, bool is_new,
                            uint8_t path_len, const uint8_t* path) override;
   void logRxRaw(float snr, float rssi, const uint8_t raw[], int len) override;
+  void logRx(mesh::Packet* packet, int len, float score) override;
+  void logTx(mesh::Packet* packet, int len) override;
 
 private:
   bool gate(const BotMsg& msg, const uint8_t rl_key[4]);
@@ -71,6 +74,7 @@ private:
   CommandRouter _router;
   RateLimiter _rl;
   BotStore _store;
+  BotObserverMqtt _mqtt;
   unsigned long _boot_ms = 0;
   float _last_rssi = 0.0f;
   float _last_snr = 0.0f;

@@ -109,6 +109,12 @@ void BotMesh::begin(bool has_display) {
   }
 
   HttpWorker::instance().begin();
+  {
+    NodePrefs* np = getNodePrefs();
+    _mqtt.begin(np ? np->node_name : getNodeName(), np ? np->freq : 0, np ? np->sf : 0,
+               np ? np->cr : 0, np ? np->bw : 0, !(np && np->isRepeatEn()),
+               _mgr, getRTCClock(), &self_id, this, _radio, _ms);
+  }
   for (auto& e : s_outq) e.used = false;
   BOT_DEBUG_PRINTLN("BotMesh ready as '%s' (%d cmds, %d cached nodes [+%d seeded], reset=%d)",
                     getNodeName(), _router.count(), _store.count(), seeded, (int)s_reset);
@@ -161,6 +167,7 @@ void BotMesh::loop() {
 
   drainOutQueue();
   _store.loop(nowEpoch());
+  _mqtt.loop();
 #endif
 }
 
@@ -215,13 +222,33 @@ bool BotMesh::lastKnownPath(const BotMsg& msg, uint8_t* out_path, uint8_t max_pa
   return false;
 }
 
-// ---- raw RX (for RSSI) -----------------------------------------------
+// ---- raw RX (for RSSI, and the MQTT observer's raw-packet stream) -----
 
 void BotMesh::logRxRaw(float snr, float rssi, const uint8_t raw[], int len) {
   MyMesh::logRxRaw(snr, rssi, raw, len);
 #if BOT_ENABLED
   _last_rssi = rssi;
   _last_snr = snr;
+  _mqtt.storeRawRadioData(raw, len, snr, rssi);
+#endif
+}
+
+// Fires for every packet the radio hears, fully parsed, before any
+// destination filtering/dedup/forwarding - the observer hook point. Does not
+// affect allowPacketForward() (stays false; the bot never relays).
+void BotMesh::logRx(mesh::Packet* packet, int len, float score) {
+  MyMesh::logRx(packet, len, score);
+#if BOT_ENABLED
+  _mqtt.onPacketReceived(packet);
+#endif
+}
+
+// Fires for every packet WE transmit (replies, adverts, ACKs, ...) - the TX
+// counterpart to logRx, so the observer's "packets" stream sees both sides.
+void BotMesh::logTx(mesh::Packet* packet, int len) {
+  MyMesh::logTx(packet, len);
+#if BOT_ENABLED
+  _mqtt.sendPacket(packet);
 #endif
 }
 
