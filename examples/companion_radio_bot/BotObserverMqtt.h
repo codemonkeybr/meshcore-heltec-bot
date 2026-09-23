@@ -30,4 +30,9 @@ public:
   void onPacketReceived(mesh::Packet* pkt);
   void storeRawRadioData(const uint8_t* raw, int len, float snr, float rssi);
   void sendPacket(mesh::Packet* pkt);
+
+  // For the web UI status page - is the bridge up, and how many of the
+  // configured broker slots are currently connected.
+  bool isReady() const;
+  int connectedBrokers() const;
 };

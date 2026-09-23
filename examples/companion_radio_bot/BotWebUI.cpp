@@ -51,6 +51,8 @@ static void status_json(String& j) {
   j += "\"drop_gap\":" + String(s.dropped_gap) + ",";
   j += "\"drop_full\":" + String(s.dropped_full) + ",";
   j += "\"send_fail\":" + String(s.send_fail) + ",";
+  j += "\"mqtt_ready\":" + String(the_mesh.mqtt().isReady() ? "true" : "false") + ",";
+  j += "\"mqtt_brokers\":" + String(the_mesh.mqtt().connectedBrokers()) + ",";
   if (p) {
     j += "\"lora\":\"" + String(p->freq, 3) + "MHz BW" + String(p->bw, 1) +
          " SF" + String(p->sf) + " CR" + String(p->cr) + "\",";

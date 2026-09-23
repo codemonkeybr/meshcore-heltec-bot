@@ -67,3 +67,6 @@ void BotObserverMqtt::storeRawRadioData(const uint8_t* raw, int len, float snr, 
 void BotObserverMqtt::sendPacket(mesh::Packet* pkt) {
   if (s_bridge) s_bridge->sendPacket(pkt);
 }
+
+bool BotObserverMqtt::isReady() const { return s_bridge && s_bridge->isReady(); }
+int BotObserverMqtt::connectedBrokers() const { return s_bridge ? s_bridge->getConnectedBrokers() : 0; }

@@ -35,6 +35,7 @@ public:
 
   CommandRouter& router() { return _router; }
   BotStore& store() { return _store; }
+  BotObserverMqtt& mqtt() { return _mqtt; }
 
   uint32_t uptimeSecs() const { return (millis() - _boot_ms) / 1000; }
   uint32_t nowEpoch() { return getRTCClock()->getCurrentTime(); }
