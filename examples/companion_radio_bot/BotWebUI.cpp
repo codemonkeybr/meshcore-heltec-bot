@@ -135,14 +135,16 @@ const rows=[["version","version",v=>v],
 ["cached nodes","cache_nodes",v=>v],["lora","lora",v=>v],["location","loc",v=>v],
 ["msgs seen","msgs",v=>v],["matched","matched",v=>v],["replies sent","replies",v=>v],
 ["drop rate/gap/full","_drop",d=>`${d.drop_rate}/${d.drop_gap}/${d.drop_full}`],
-["send fail","send_fail",v=>v]];
+["send fail","send_fail",v=>v],
+["mqtt","_mqtt",d=>d.mqtt_ready?`up · ${d.mqtt_brokers} broker${d.mqtt_brokers==1?"":"s"}`:"down"],
+["mqtt stats","mqtt_stats",v=>v]];
 async function tick(){
  try{
   let d=await (await fetch("/api/status")).json();
   document.getElementById("name").textContent=d.name;
   document.getElementById("t").innerHTML=rows.map(([k,f,fn])=>{
    let v=f[0]==="_"?fn(d):fn(d[f]);
-   let cls=(f==="reset"&&d.reset!=="clean")||(f==="send_fail"&&d.send_fail>0)?" class=bad":"";
+   let cls=(f==="reset"&&d.reset!=="clean")||(f==="send_fail"&&d.send_fail>0)||(f==="_mqtt"&&!d.mqtt_ready)?" class=bad":"";
    return `<tr><td>${k}</td><td${cls}>${v}</td></tr>`}).join("");
  }catch(e){}
 }
