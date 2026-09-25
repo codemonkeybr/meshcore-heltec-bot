@@ -35,4 +35,10 @@ public:
   // configured broker slots are currently connected.
   bool isReady() const;
   int connectedBrokers() const;
+
+  // Compact diagnostic line: free/max heap, packet queue depth, per-slot
+  // outbox size + drops, skipped-publish count (memory-pressure throttling),
+  // filtered-packet count, per-slot publish ok/err. Same string the
+  // reference firmware's `get mqtt.stats` CLI command produces.
+  void statsReply(char* buf, size_t bufsize) const;
 };

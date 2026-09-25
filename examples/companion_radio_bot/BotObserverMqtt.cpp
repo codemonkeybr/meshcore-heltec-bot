@@ -70,3 +70,7 @@ void BotObserverMqtt::sendPacket(mesh::Packet* pkt) {
 
 bool BotObserverMqtt::isReady() const { return s_bridge && s_bridge->isReady(); }
 int BotObserverMqtt::connectedBrokers() const { return s_bridge ? s_bridge->getConnectedBrokers() : 0; }
+
+void BotObserverMqtt::statsReply(char* buf, size_t bufsize) const {
+  MQTTBridge::formatMqttStatsReply(buf, bufsize);   // static; "(bridge not running)" if unset
+}

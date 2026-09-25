@@ -31,7 +31,7 @@ static void status_json(String& j) {
   const char* rst = BotMesh::lastResetReason();
   uint32_t up = the_mesh.uptimeSecs();
 
-  j.reserve(640);
+  j.reserve(768);
   j = "{";
   j += "\"name\":\"" + String(the_mesh.getNodeName()) + "\",";
   j += "\"version\":\"" BOT_VERSION " " __DATE__ " " __TIME__ "\",";
@@ -53,6 +53,11 @@ static void status_json(String& j) {
   j += "\"send_fail\":" + String(s.send_fail) + ",";
   j += "\"mqtt_ready\":" + String(the_mesh.mqtt().isReady() ? "true" : "false") + ",";
   j += "\"mqtt_brokers\":" + String(the_mesh.mqtt().connectedBrokers()) + ",";
+  {
+    char mqs[160];
+    the_mesh.mqtt().statsReply(mqs, sizeof(mqs));
+    j += "\"mqtt_stats\":\"" + String(mqs) + "\",";
+  }
   if (p) {
     j += "\"lora\":\"" + String(p->freq, 3) + "MHz BW" + String(p->bw, 1) +
          " SF" + String(p->sf) + " CR" + String(p->cr) + "\",";
