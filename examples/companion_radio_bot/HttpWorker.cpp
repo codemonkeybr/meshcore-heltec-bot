@@ -1,5 +1,6 @@
 #include "HttpWorker.h"
 #include "BotDebug.h"
+#include "PsramJsonAlloc.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -9,16 +10,52 @@
 #include <freertos/queue.h>
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 static QueueHandle_t s_jobs = nullptr;
 static QueueHandle_t s_results = nullptr;
 static TaskHandle_t  s_task = nullptr;
 static volatile bool s_busy = false;
 
+// Shared by every JsonDocument constructed in this file - HttpWorker only
+// ever runs one job at a time (see busy()/s_busy below), so no concurrent use.
+static PsramJsonAllocator s_json_alloc;
+
+// Fixed-capacity sink for HTTPClient::writeToStream(), replacing a dynamic
+// String body. Never overflows: write() copies only what still fits and
+// returns a short count once full, which HTTPClient treats as a stream-write
+// error (HTTPC_ERROR_STREAM_WRITE) and aborts cleanly - same failure class as
+// the pre-existing response-size cap below.
+class FixedBufStream : public Stream {
+public:
+  FixedBufStream(char* buf, size_t cap) : _buf(buf), _cap(cap) {}
+  size_t write(const uint8_t* data, size_t size) override {
+    size_t room = _len < _cap - 1 ? _cap - 1 - _len : 0;
+    size_t n = size < room ? size : room;
+    memcpy(_buf + _len, data, n);
+    _len += n;
+    _buf[_len] = '\0';
+    return n;
+  }
+  size_t write(uint8_t b) override { return write(&b, 1); }
+  int available() override { return 0; }
+  int read() override { return -1; }
+  int peek() override { return -1; }
+  size_t length() const { return _len; }
+private:
+  char* _buf; size_t _cap; size_t _len = 0;
+};
+
+// PSRAM-backed, allocated once in HttpWorker::begin(); matches the existing
+// 24000-byte response-size cap in fetch_json() below.
+static const size_t HTTP_BODY_BUF_SIZE = 24001;
+static char* s_http_body = nullptr;
+
 HttpWorker& HttpWorker::instance() { static HttpWorker w; return w; }
 
 void HttpWorker::begin() {
   if (s_task) return;
+  if (!s_http_body) s_http_body = (char*)psram_malloc(HTTP_BODY_BUF_SIZE);
   s_jobs = xQueueCreate(2, sizeof(HttpJob));
   s_results = xQueueCreate(3, sizeof(HttpResult));
   xTaskCreatePinnedToCore(taskEntry, "bot_http", BOT_HTTP_TASK_STACK, this, 1, &s_task, 0);
@@ -102,14 +139,19 @@ static int fetch_json(const char* url, JsonDocument& doc, bool accept_json = tru
   int code = http.GET();
   if (code == 200) {
     int len = http.getSize();
-    if (len > 24000) { http.end(); BOT_DEBUG_PRINTLN("resp too big: %d", len); return -3; }
-    // getString() de-chunks (getStream() leaves chunk framing in the bytes).
-    String body = http.getString();
+    if (len > (int)(HTTP_BODY_BUF_SIZE - 1)) { http.end(); BOT_DEBUG_PRINTLN("resp too big: %d", len); return -3; }
+    if (!s_http_body) { http.end(); return -4; }
+    // writeToStream() de-chunks internally (same as getString(); getStream()
+    // alone would leave chunk framing in the bytes) but writes into our fixed
+    // buffer instead of growing a String.
+    FixedBufStream sink(s_http_body, HTTP_BODY_BUF_SIZE);
+    int wrc = http.writeToStream(&sink);
+    if (wrc < 0) { BOT_DEBUG_PRINTLN("http body read err: %d", wrc); http.end(); return -5; }
     DeserializationError err = filter
-        ? deserializeJson(doc, body, DeserializationOption::Filter(*filter))
-        : deserializeJson(doc, body);
+        ? deserializeJson(doc, s_http_body, sink.length(), DeserializationOption::Filter(*filter))
+        : deserializeJson(doc, s_http_body, sink.length());
     if (err) {
-      BOT_DEBUG_PRINTLN("json err: %s (body %u b)", err.c_str(), (unsigned)body.length());
+      BOT_DEBUG_PRINTLN("json err: %s (body %u b)", err.c_str(), (unsigned)sink.length());
       code = -2;
     }
   }
@@ -130,7 +172,7 @@ static void do_wx(const HttpJob& j, char* out, size_t n) {
     BOT_WX_METRIC ? "celsius" : "fahrenheit",
     BOT_WX_METRIC ? "kmh" : "mph");
 
-  JsonDocument doc;
+  JsonDocument doc(&s_json_alloc);
   int code = fetch_json(url, doc, false, nullptr);
   if (code != 200) { snprintf(out, n, "weather unavailable (%d)", code); return; }
 
@@ -165,7 +207,7 @@ static void do_aqi(const HttpJob& j, char* out, size_t n) {
   snprintf(url, sizeof(url),
     "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=%.4f&longitude=%.4f"
     "&current=us_aqi,pm2_5,pm10,ozone", j.lat, j.lon);
-  JsonDocument doc;
+  JsonDocument doc(&s_json_alloc);
   int code = fetch_json(url, doc, false, nullptr);
   if (code != 200) { snprintf(out, n, "AQI unavailable (%d)", code); return; }
 
@@ -184,7 +226,7 @@ static void do_rain(const HttpJob& j, char* out, size_t n) {
   snprintf(url, sizeof(url),
     "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
     "&minutely_15=precipitation&forecast_minutely_15=8", j.lat, j.lon);
-  JsonDocument doc;
+  JsonDocument doc(&s_json_alloc);
   int code = fetch_json(url, doc, false, nullptr);
   if (code != 200) { snprintf(out, n, "rain nowcast unavailable (%d)", code); return; }
 
@@ -206,7 +248,7 @@ static void do_rain(const HttpJob& j, char* out, size_t n) {
 }
 
 static bool fetch_noaa_val(const char* url, const char* const* keys, char* val, size_t vn) {
-  JsonDocument doc;
+  JsonDocument doc(&s_json_alloc);
   if (fetch_json(url, doc, false) != 200) return false;
   for (int i = 0; keys[i]; i++) {
     JsonVariant v = doc[keys[i]];
@@ -238,9 +280,9 @@ static void do_solar(const HttpJob&, char* out, size_t n) {
 }
 
 static void do_joke(const HttpJob&, char* out, size_t n) {
-  JsonDocument filter;
+  JsonDocument filter(&s_json_alloc);
   filter["joke"] = true;
-  JsonDocument doc;
+  JsonDocument doc(&s_json_alloc);
   int code = fetch_json("https://v2.jokeapi.dev/joke/Any?safe-mode&type=single&format=json",
                         doc, true, &filter);
   if (code != 200 || doc["joke"].isNull()) { snprintf(out, n, "no joke right now (%d)", code); return; }
@@ -248,8 +290,8 @@ static void do_joke(const HttpJob&, char* out, size_t n) {
 }
 
 static void do_dadjoke(const HttpJob&, char* out, size_t n) {
-  JsonDocument filter; filter["joke"] = true;
-  JsonDocument doc;
+  JsonDocument filter(&s_json_alloc); filter["joke"] = true;
+  JsonDocument doc(&s_json_alloc);
   int code = fetch_json("https://icanhazdadjoke.com/", doc, true, &filter);
   if (code != 200 || doc["joke"].isNull()) { snprintf(out, n, "no dad joke right now (%d)", code); return; }
   strlcpy(out, doc["joke"] | "?", n);
