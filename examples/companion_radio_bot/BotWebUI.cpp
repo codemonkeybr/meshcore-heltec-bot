@@ -3,6 +3,8 @@
 #include "BotConfig.h"
 #include "BotDebug.h"
 #include "BotStore.h"
+#include "PsramJsonAlloc.h"
+#include "helpers/MQTTReplyFormat.h"
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
@@ -25,84 +27,87 @@ static bool auth_ok(AsyncWebServerRequest* r) {
   return false;
 }
 
-static void status_json(String& j) {
+static const size_t STATUS_JSON_BUF_SIZE = 900;
+
+static void status_json(char* buf, size_t bufsize) {
   const BotMesh::Stats& s = the_mesh.stats;
   NodePrefs* p = the_mesh.getNodePrefs();
   const char* rst = BotMesh::lastResetReason();
   uint32_t up = the_mesh.uptimeSecs();
 
-  j.reserve(768);
-  j = "{";
-  j += "\"name\":\"" + String(the_mesh.getNodeName()) + "\",";
-  j += "\"version\":\"" BOT_VERSION " " __DATE__ " " __TIME__ "\",";
-  j += "\"uptime_s\":" + String(up) + ",";
-  j += "\"heap_free\":" + String(ESP.getFreeHeap()) + ",";
-  j += "\"heap_min\":" + String(ESP.getMinFreeHeap()) + ",";
-  j += "\"reset\":\"" + String(rst ? rst : "clean") + "\",";
-  j += "\"clock\":" + String(the_mesh.nowEpoch()) + ",";
-  j += "\"clock_ntp\":" + String(BotMesh::clockSynced() ? "true" : "false") + ",";
-  j += "\"wifi_rssi\":" + String(WiFi.RSSI()) + ",";
-  j += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
-  j += "\"cache_nodes\":" + String(the_mesh.store().count()) + ",";
-  j += "\"msgs\":" + String(s.msgs) + ",";
-  j += "\"matched\":" + String(s.matched) + ",";
-  j += "\"replies\":" + String(s.replies) + ",";
-  j += "\"drop_rate\":" + String(s.dropped_rate) + ",";
-  j += "\"drop_gap\":" + String(s.dropped_gap) + ",";
-  j += "\"drop_full\":" + String(s.dropped_full) + ",";
-  j += "\"send_fail\":" + String(s.send_fail) + ",";
-  j += "\"mqtt_ready\":" + String(the_mesh.mqtt().isReady() ? "true" : "false") + ",";
-  j += "\"mqtt_brokers\":" + String(the_mesh.mqtt().connectedBrokers()) + ",";
+  int pos = 0;
+  replyAppendf(buf, bufsize, &pos, "{");
+  replyAppendf(buf, bufsize, &pos, "\"name\":\"%s\",", the_mesh.getNodeName());
+  replyAppendf(buf, bufsize, &pos, "\"version\":\"" BOT_VERSION " " __DATE__ " " __TIME__ "\",");
+  replyAppendf(buf, bufsize, &pos, "\"uptime_s\":%u,", (unsigned)up);
+  replyAppendf(buf, bufsize, &pos, "\"heap_free\":%u,", (unsigned)ESP.getFreeHeap());
+  replyAppendf(buf, bufsize, &pos, "\"heap_min\":%u,", (unsigned)ESP.getMinFreeHeap());
+  replyAppendf(buf, bufsize, &pos, "\"reset\":\"%s\",", rst ? rst : "clean");
+  replyAppendf(buf, bufsize, &pos, "\"clock\":%u,", (unsigned)the_mesh.nowEpoch());
+  replyAppendf(buf, bufsize, &pos, "\"clock_ntp\":%s,", BotMesh::clockSynced() ? "true" : "false");
+  replyAppendf(buf, bufsize, &pos, "\"wifi_rssi\":%d,", (int)WiFi.RSSI());
+  replyAppendf(buf, bufsize, &pos, "\"ip\":\"%s\",", WiFi.localIP().toString().c_str());
+  replyAppendf(buf, bufsize, &pos, "\"cache_nodes\":%d,", the_mesh.store().count());
+  replyAppendf(buf, bufsize, &pos, "\"msgs\":%u,", (unsigned)s.msgs);
+  replyAppendf(buf, bufsize, &pos, "\"matched\":%u,", (unsigned)s.matched);
+  replyAppendf(buf, bufsize, &pos, "\"replies\":%u,", (unsigned)s.replies);
+  replyAppendf(buf, bufsize, &pos, "\"drop_rate\":%u,", (unsigned)s.dropped_rate);
+  replyAppendf(buf, bufsize, &pos, "\"drop_gap\":%u,", (unsigned)s.dropped_gap);
+  replyAppendf(buf, bufsize, &pos, "\"drop_full\":%u,", (unsigned)s.dropped_full);
+  replyAppendf(buf, bufsize, &pos, "\"send_fail\":%u,", (unsigned)s.send_fail);
+  replyAppendf(buf, bufsize, &pos, "\"mqtt_ready\":%s,", the_mesh.mqtt().isReady() ? "true" : "false");
+  replyAppendf(buf, bufsize, &pos, "\"mqtt_brokers\":%d,", the_mesh.mqtt().connectedBrokers());
   {
     char mqs[160];
     the_mesh.mqtt().statsReply(mqs, sizeof(mqs));
-    j += "\"mqtt_stats\":\"" + String(mqs) + "\",";
+    replyAppendf(buf, bufsize, &pos, "\"mqtt_stats\":\"%s\",", mqs);
   }
   if (p) {
-    j += "\"lora\":\"" + String(p->freq, 3) + "MHz BW" + String(p->bw, 1) +
-         " SF" + String(p->sf) + " CR" + String(p->cr) + "\",";
-    j += "\"loc\":\"" + String(p->node_lat, 5) + "," + String(p->node_lon, 5) + "\"";
+    replyAppendf(buf, bufsize, &pos, "\"lora\":\"%.3fMHz BW%.1f SF%u CR%u\",",
+                p->freq, p->bw, (unsigned)p->sf, (unsigned)p->cr);
+    replyAppendf(buf, bufsize, &pos, "\"loc\":\"%.5f,%.5f\"", p->node_lat, p->node_lon);
   } else {
-    j += "\"lora\":\"?\",\"loc\":\"?\"";
+    replyAppendf(buf, bufsize, &pos, "\"lora\":\"?\",\"loc\":\"?\"");
   }
-  j += "}";
+  replyAppendf(buf, bufsize, &pos, "}");
 }
 
 // Full dump of the persistent node/repeater cache (BotStore), for debugging
 // name-resolution issues (e.g. two nodes sharing a 1-byte hop hash prefix) -
 // the same cache `path`/`prefix` resolve against, without needing a mesh
 // command relayed back by hand.
-static const char HEXD[] = "0123456789abcdef";
+// PSRAM-backed, allocated once in BotWebUI::begin() - 400 records * ~186B
+// worst case (escaped 31-char name + full lat/lon + hash + last_advert) fits
+// comfortably with margin, so no truncation logic is needed.
+static const size_t NODES_JSON_BUF_SIZE = 81920;
+static char* s_nodes_json_buf = nullptr;
 
-static void nodes_json(String& j) {
+static size_t nodes_json(char* buf, size_t bufsize) {
   static const NodeRec* recs[BOT_LOCCACHE_MAX];
   int n = the_mesh.store().listAll(recs, BOT_LOCCACHE_MAX);
 
-  j.reserve((size_t)n * 96 + 16);
-  j = "[";
+  int pos = 0;
+  replyAppendf(buf, bufsize, &pos, "{\"total\":%d,\"nodes\":[", n);
   for (int i = 0; i < n; i++) {
     const NodeRec* r = recs[i];
-    if (i) j += ",";
-    j += "{\"hash\":\"";
-    for (int b = 0; b < 6; b++) {
-      j += HEXD[(r->pubkey[b] >> 4) & 0xF];
-      j += HEXD[r->pubkey[b] & 0xF];
+    if (i) replyAppendf(buf, bufsize, &pos, ",");
+    replyAppendf(buf, bufsize, &pos, "{\"hash\":\"");
+    for (int b = 0; b < 6; b++)
+      replyAppendf(buf, bufsize, &pos, "%02x", r->pubkey[b]);
+    replyAppendf(buf, bufsize, &pos, "\",\"name\":\"");
+    for (const char* pch = r->name; *pch; pch++) {
+      if (*pch == '"' || *pch == '\\') replyAppendf(buf, bufsize, &pos, "\\");
+      replyAppendf(buf, bufsize, &pos, "%c", *pch);
     }
-    j += "\",\"name\":\"";
-    for (const char* p = r->name; *p; p++) {
-      if (*p == '"' || *p == '\\') j += '\\';
-      j += *p;
-    }
-    j += "\",\"type\":" + String(r->type);
-    j += ",\"has_loc\":" + String(r->hasLoc() ? "true" : "false");
-    if (r->hasLoc()) {
-      j += ",\"lat\":" + String(r->lat_e6 / 1e6, 6);
-      j += ",\"lon\":" + String(r->lon_e6 / 1e6, 6);
-    }
-    j += ",\"last_advert\":" + String(r->last_advert);
-    j += "}";
+    replyAppendf(buf, bufsize, &pos, "\",\"type\":%u,\"has_loc\":%s",
+                (unsigned)r->type, r->hasLoc() ? "true" : "false");
+    if (r->hasLoc())
+      replyAppendf(buf, bufsize, &pos, ",\"lat\":%.6f,\"lon\":%.6f",
+                  r->lat_e6 / 1e6, r->lon_e6 / 1e6);
+    replyAppendf(buf, bufsize, &pos, ",\"last_advert\":%u}", (unsigned)r->last_advert);
   }
-  j += "]";
+  replyAppendf(buf, bufsize, &pos, "]}");
+  return (size_t)pos;
 }
 
 static const char PAGE[] = R"HTML(<!doctype html><meta charset=utf-8>
@@ -155,19 +160,23 @@ tick();setInterval(tick,3000);
 void BotWebUI::begin() {
   if (s_started) return;
 
+  if (!s_nodes_json_buf) s_nodes_json_buf = (char*)psram_malloc(NODES_JSON_BUF_SIZE);
+
   s_server.on("/", HTTP_GET, [](AsyncWebServerRequest* r) {
     if (!auth_ok(r)) return;
     r->send(200, "text/html", PAGE);
   });
   s_server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest* r) {
     if (!auth_ok(r)) return;
-    String j; status_json(j);
-    r->send(200, "application/json", j);
+    char buf[STATUS_JSON_BUF_SIZE];
+    status_json(buf, sizeof(buf));
+    r->send(200, "application/json", buf);
   });
   s_server.on("/api/nodes", HTTP_GET, [](AsyncWebServerRequest* r) {
     if (!auth_ok(r)) return;
-    String j; nodes_json(j);
-    r->send(200, "application/json", j);
+    if (!s_nodes_json_buf) { r->send(503, "text/plain", "buffer unavailable"); return; }
+    nodes_json(s_nodes_json_buf, NODES_JSON_BUF_SIZE);
+    r->send(200, "application/json", s_nodes_json_buf);
   });
 
   AsyncElegantOTA.begin(&s_server, BOT_WEB_USER, BOT_WEB_PASS);
