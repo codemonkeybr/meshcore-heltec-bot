@@ -62,6 +62,12 @@ static void status_json(char* buf, size_t bufsize) {
     the_mesh.mqtt().statsReply(mqs, sizeof(mqs));
     replyAppendf(buf, bufsize, &pos, "\"mqtt_stats\":\"%s\",", mqs);
   }
+#if BOT_DEV_FEATURES
+  replyAppendf(buf, bufsize, &pos, "\"mqtt_attempts\":%lu,", the_mesh.mqtt().publishAttempts());
+  replyAppendf(buf, bufsize, &pos, "\"mqtt_skipped\":%d,", the_mesh.mqtt().skippedPublishes());
+  replyAppendf(buf, bufsize, &pos, "\"mqtt_max_alloc\":%u,", (unsigned)ESP.getMaxAllocHeap());
+  replyAppendf(buf, bufsize, &pos, "\"mqtt_skip_threshold\":%u,", (unsigned)the_mesh.mqtt().skipThreshold());
+#endif
   if (p) {
     replyAppendf(buf, bufsize, &pos, "\"lora\":\"%.3fMHz BW%.1f SF%u CR%u\",",
                 p->freq, p->bw, (unsigned)p->sf, (unsigned)p->cr);
@@ -123,6 +129,7 @@ td:first-child{color:#7d8a85;width:40%}
 td:last-child{font-variant-numeric:tabular-nums}
 a{color:#3fbaa3}
 .bad{color:#e07a7a}
+.warn{color:#e0c07a}
 </style>
 <div class=w>
 <h1 id=name>D4rl3k</h1>
@@ -143,13 +150,23 @@ const rows=[["version","version",v=>v],
 ["send fail","send_fail",v=>v],
 ["mqtt","_mqtt",d=>d.mqtt_ready?`up · ${d.mqtt_brokers} broker${d.mqtt_brokers==1?"":"s"}`:"down"],
 ["mqtt stats","mqtt_stats",v=>v]];
+)HTML"
+#if BOT_DEV_FEATURES
+R"HTML(rows.push(
+["mqtt loss","_loss",d=>d.mqtt_attempts?`${(100*d.mqtt_skipped/d.mqtt_attempts).toFixed(2)}% (${d.mqtt_skipped} / ${d.mqtt_attempts})`:"-"],
+["heap headroom","_room",d=>`${d.mqtt_max_alloc-d.mqtt_skip_threshold} B`]);
+)HTML"
+#endif
+R"HTML(
 async function tick(){
  try{
   let d=await (await fetch("/api/status")).json();
   document.getElementById("name").textContent=d.name;
   document.getElementById("t").innerHTML=rows.map(([k,f,fn])=>{
    let v=f[0]==="_"?fn(d):fn(d[f]);
-   let cls=(f==="reset"&&d.reset!=="clean")||(f==="send_fail"&&d.send_fail>0)||(f==="_mqtt"&&!d.mqtt_ready)?" class=bad":"";
+   let cls=(f==="reset"&&d.reset!=="clean")||(f==="send_fail"&&d.send_fail>0)||(f==="_mqtt"&&!d.mqtt_ready)
+    ||(f==="_loss"&&d.mqtt_attempts&&d.mqtt_skipped*100>=d.mqtt_attempts)||(f==="_room"&&d.mqtt_max_alloc<d.mqtt_skip_threshold)?" class=bad"
+    :(f==="_room"&&d.mqtt_max_alloc-d.mqtt_skip_threshold<1024)?" class=warn":"";
    return `<tr><td>${k}</td><td${cls}>${v}</td></tr>`}).join("");
  }catch(e){}
 }

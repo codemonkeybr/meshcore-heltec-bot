@@ -360,6 +360,9 @@ private:
   unsigned long _last_memory_check;
   bool _memory_pressure = false;  // Cached max-alloc verdict; re-sampled at most once per interval in publishPacket() so the heap walk isn't paid per-packet under pressure
   int _skipped_publishes;  // Exposed via SNMP; count of publishes skipped when max_alloc is too low
+  // Every publishPacket() call that reaches the memory-pressure check (retries
+  // included, same as _skipped_publishes) - the denominator for a skip rate.
+  unsigned long _publish_attempts = 0;
   // Packets rejected by the per-slot filters before reaching the queue. Written
   // on Core 1 (radio callbacks), read on Core 0 for `mqtt.stats`; a torn read of
   // a diagnostic counter is harmless, so no atomic is warranted.
@@ -615,6 +618,17 @@ public:
 
   int getConnectedBrokers() const;
   int getQueueSize() const;
+  // Memory-pressure skip accounting: publishPacket() skips a publish while the
+  // largest free heap block is below publishSkipThreshold().
+  unsigned long getPublishAttempts() const { return _publish_attempts; }
+  int getSkippedPublishes() const { return _skipped_publishes; }
+  static size_t publishSkipThreshold() {
+#if defined(ESP32) && defined(BOARD_HAS_PSRAM)
+    return 16000;
+#else
+    return 8000;
+#endif
+  }
   bool isReady() const;
   /** True only after a CLEAN cooperative stop — end() received the MQTT task's
    *  acknowledgment within the timeout. A timed-out/forced stop returns false so

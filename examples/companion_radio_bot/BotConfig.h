@@ -12,6 +12,13 @@
 
 // Local time offset from UTC, in minutes, for almanac output (sun/moon).
 // e.g. -480 = PST, -420 = PDT, 60 = CET. The device clock itself stays UTC.
+// Alpha-phase diagnostics (extra /api/status fields + status page rows, e.g.
+// the MQTT memory-pressure loss rate). Remove along with the code it gates
+// once out of alpha.
+#ifndef BOT_DEV_FEATURES
+#define BOT_DEV_FEATURES 0
+#endif
+
 #ifndef BOT_TZ_OFFSET_MIN
 #define BOT_TZ_OFFSET_MIN 0
 #endif

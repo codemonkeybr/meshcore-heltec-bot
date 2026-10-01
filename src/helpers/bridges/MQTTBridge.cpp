@@ -3438,11 +3438,8 @@ bool MQTTBridge::publishPacket(mesh::Packet* packet, bool is_tx,
   // payload is capped at PUBLISH_JSON_BUFFER_SIZE (2 KB); 8 KB is a safe
   // ceiling including esp-mqtt frame overhead and transient TCP buffers.
   #ifdef ESP32
-  #if defined(BOARD_HAS_PSRAM)
-  static const size_t PUBLISH_SKIP_MAX_ALLOC_THRESHOLD = 16000;
-  #else
-  static const size_t PUBLISH_SKIP_MAX_ALLOC_THRESHOLD = 8000;
-  #endif
+  const size_t PUBLISH_SKIP_MAX_ALLOC_THRESHOLD = publishSkipThreshold();
+  _publish_attempts++;
   unsigned long now = millis();
   // Re-sample max-alloc at most once per interval and cache the verdict.
   // getMaxAllocHeap() walks the heap free-list, so it must not run per packet.

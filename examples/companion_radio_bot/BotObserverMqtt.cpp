@@ -74,3 +74,7 @@ int BotObserverMqtt::connectedBrokers() const { return s_bridge ? s_bridge->getC
 void BotObserverMqtt::statsReply(char* buf, size_t bufsize) const {
   MQTTBridge::formatMqttStatsReply(buf, bufsize);   // static; "(bridge not running)" if unset
 }
+
+unsigned long BotObserverMqtt::publishAttempts() const { return s_bridge ? s_bridge->getPublishAttempts() : 0; }
+int BotObserverMqtt::skippedPublishes() const { return s_bridge ? s_bridge->getSkippedPublishes() : 0; }
+size_t BotObserverMqtt::skipThreshold() const { return MQTTBridge::publishSkipThreshold(); }
