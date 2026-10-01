@@ -63,8 +63,8 @@ static void status_json(char* buf, size_t bufsize) {
     replyAppendf(buf, bufsize, &pos, "\"mqtt_stats\":\"%s\",", mqs);
   }
 #if BOT_DEV_FEATURES
-  replyAppendf(buf, bufsize, &pos, "\"mqtt_attempts\":%lu,", the_mesh.mqtt().publishAttempts());
-  replyAppendf(buf, bufsize, &pos, "\"mqtt_skipped\":%d,", the_mesh.mqtt().skippedPublishes());
+  replyAppendf(buf, bufsize, &pos, "\"mqtt_pkts\":%lu,", the_mesh.mqtt().packetsSeen());
+  replyAppendf(buf, bufsize, &pos, "\"mqtt_lost\":%lu,", the_mesh.mqtt().packetsLostToPressure());
   replyAppendf(buf, bufsize, &pos, "\"mqtt_max_alloc\":%u,", (unsigned)ESP.getMaxAllocHeap());
   replyAppendf(buf, bufsize, &pos, "\"mqtt_skip_threshold\":%u,", (unsigned)the_mesh.mqtt().skipThreshold());
 #endif
@@ -153,7 +153,7 @@ const rows=[["version","version",v=>v],
 )HTML"
 #if BOT_DEV_FEATURES
 R"HTML(rows.push(
-["mqtt loss","_loss",d=>d.mqtt_attempts?`${(100*d.mqtt_skipped/d.mqtt_attempts).toFixed(2)}% (${d.mqtt_skipped} / ${d.mqtt_attempts})`:"-"],
+["mqtt loss","_loss",d=>d.mqtt_pkts?`${(100*d.mqtt_lost/d.mqtt_pkts).toFixed(2)}% (${d.mqtt_lost} / ${d.mqtt_pkts})`:"-"],
 ["heap headroom","_room",d=>`${d.mqtt_max_alloc-d.mqtt_skip_threshold} B`]);
 )HTML"
 #endif
@@ -165,7 +165,7 @@ async function tick(){
   document.getElementById("t").innerHTML=rows.map(([k,f,fn])=>{
    let v=f[0]==="_"?fn(d):fn(d[f]);
    let cls=(f==="reset"&&d.reset!=="clean")||(f==="send_fail"&&d.send_fail>0)||(f==="_mqtt"&&!d.mqtt_ready)
-    ||(f==="_loss"&&d.mqtt_attempts&&d.mqtt_skipped*100>=d.mqtt_attempts)||(f==="_room"&&d.mqtt_max_alloc<d.mqtt_skip_threshold)?" class=bad"
+    ||(f==="_loss"&&d.mqtt_pkts&&d.mqtt_lost*100>=d.mqtt_pkts)||(f==="_room"&&d.mqtt_max_alloc<d.mqtt_skip_threshold)?" class=bad"
     :(f==="_room"&&d.mqtt_max_alloc-d.mqtt_skip_threshold<1024)?" class=warn":"";
    return `<tr><td>${k}</td><td${cls}>${v}</td></tr>`}).join("");
  }catch(e){}

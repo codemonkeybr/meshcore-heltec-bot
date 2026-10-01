@@ -3068,6 +3068,8 @@ void MQTTBridge::processPacketQueue() {
         MQTTPacketQueuePolicy::retryDecision(
             queue_complete, queued.retry_attempts,
             static_cast<uint32_t>(now_ms));
+    notePacketOutcome(queued.retry_attempts, packet_eligible,
+                      retry.action == MQTTPacketQueuePolicy::RetryAction::Drop);
     if (retry.action == MQTTPacketQueuePolicy::RetryAction::Schedule) {
       queued.retry_attempts = retry.retry_attempts;
       queued.next_retry_ms = retry.next_retry_ms;
@@ -3202,6 +3204,8 @@ void MQTTBridge::processPacketQueue() {
         MQTTPacketQueuePolicy::retryDecision(
             queue_complete, queued.retry_attempts,
             static_cast<uint32_t>(now_ms));
+    notePacketOutcome(queued.retry_attempts, packet_eligible,
+                      retry.action == MQTTPacketQueuePolicy::RetryAction::Drop);
     if (retry.action == MQTTPacketQueuePolicy::RetryAction::Schedule) {
       queued.retry_attempts = retry.retry_attempts;
       queued.next_retry_ms = retry.next_retry_ms;
@@ -3439,7 +3443,7 @@ bool MQTTBridge::publishPacket(mesh::Packet* packet, bool is_tx,
   // ceiling including esp-mqtt frame overhead and transient TCP buffers.
   #ifdef ESP32
   const size_t PUBLISH_SKIP_MAX_ALLOC_THRESHOLD = publishSkipThreshold();
-  _publish_attempts++;
+  _last_publish_skipped = false;
   unsigned long now = millis();
   // Re-sample max-alloc at most once per interval and cache the verdict.
   // getMaxAllocHeap() walks the heap free-list, so it must not run per packet.
@@ -3459,6 +3463,7 @@ bool MQTTBridge::publishPacket(mesh::Packet* packet, bool is_tx,
   }
   if (_memory_pressure) {
     _skipped_publishes++;
+    _last_publish_skipped = true;
     return false;
   }
   #endif

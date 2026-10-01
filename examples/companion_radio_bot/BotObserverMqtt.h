@@ -42,10 +42,10 @@ public:
   // reference firmware's `get mqtt.stats` CLI command produces.
   void statsReply(char* buf, size_t bufsize) const;
 
-  // Memory-pressure skip accounting (BOT_DEV_FEATURES status rows): publish
-  // attempts and how many were skipped because the largest free heap block was
-  // below skipThreshold(). Both count retries, so skipped/attempts is a rate.
-  unsigned long publishAttempts() const;
-  int skippedPublishes() const;
+  // Memory-pressure loss accounting (BOT_DEV_FEATURES status rows): packets
+  // handed to the publisher (counted once, not per retry) and how many were
+  // dropped because every retry hit the largest-free-block < skipThreshold() guard.
+  unsigned long packetsSeen() const;
+  unsigned long packetsLostToPressure() const;
   size_t skipThreshold() const;
 };
