@@ -3,11 +3,16 @@
 #include "BotConfig.h"
 #include "BotDebug.h"
 #include "BotStore.h"
+#include "BotHeapLog.h"
 #include "PsramJsonAlloc.h"
 #include "helpers/MQTTReplyFormat.h"
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
+#if BOT_DEV_FEATURES
+#include <esp_core_dump.h>
+#include <esp_flash.h>
+#endif
 
 #ifndef BOT_WEB_USER
 #define BOT_WEB_USER "admin"
@@ -22,12 +27,15 @@ static AsyncWebServer s_server(80);
 static bool s_started = false;
 
 static bool auth_ok(AsyncWebServerRequest* r) {
+#if BOT_DEV_FEATURES
+  BotHeapLog::noteWebRequest();
+#endif
   if (r->authenticate(BOT_WEB_USER, BOT_WEB_PASS)) return true;
   r->requestAuthentication();
   return false;
 }
 
-static const size_t STATUS_JSON_BUF_SIZE = 900;
+static const size_t STATUS_JSON_BUF_SIZE = 1280;
 
 static void status_json(char* buf, size_t bufsize) {
   const BotMesh::Stats& s = the_mesh.stats;
@@ -67,6 +75,18 @@ static void status_json(char* buf, size_t bufsize) {
   replyAppendf(buf, bufsize, &pos, "\"mqtt_lost\":%lu,", the_mesh.mqtt().packetsLostToPressure());
   replyAppendf(buf, bufsize, &pos, "\"mqtt_max_alloc\":%u,", (unsigned)ESP.getMaxAllocHeap());
   replyAppendf(buf, bufsize, &pos, "\"mqtt_skip_threshold\":%u,", (unsigned)the_mesh.mqtt().skipThreshold());
+  {
+    uint32_t fb, ab, lg;
+    BotHeapLog::heapInfo(&fb, &ab, &lg);
+    replyAppendf(buf, bufsize, &pos, "\"int_free_blocks\":%lu,\"int_alloc_blocks\":%lu,",
+                 (unsigned long)fb, (unsigned long)ab);
+    replyAppendf(buf, bufsize, &pos, "\"mqtt_dc\":[%lu,%lu],\"mqtt_renew\":[%lu,%lu],",
+                 (unsigned long)the_mesh.mqtt().slotDisconnects(0), (unsigned long)the_mesh.mqtt().slotDisconnects(1),
+                 (unsigned long)the_mesh.mqtt().slotRenewalReconnects(0), (unsigned long)the_mesh.mqtt().slotRenewalReconnects(1));
+    replyAppendf(buf, bufsize, &pos, "\"http_fetches\":%lu,\"web_reqs\":%lu,\"wifi_dc\":%lu,\"heaplog_n\":%lu,",
+                 (unsigned long)BotHeapLog::httpFetches(), (unsigned long)BotHeapLog::webRequests(),
+                 (unsigned long)BotHeapLog::wifiDisconnects(), (unsigned long)BotHeapLog::entries());
+  }
 #endif
   if (p) {
     replyAppendf(buf, bufsize, &pos, "\"lora\":\"%.3fMHz BW%.1f SF%u CR%u\",",
@@ -195,6 +215,42 @@ void BotWebUI::begin() {
     nodes_json(s_nodes_json_buf, NODES_JSON_BUF_SIZE);
     r->send(200, "application/json", s_nodes_json_buf);
   });
+
+#if BOT_DEV_FEATURES
+  // Heap-fragmentation probe: step-change log (?n=newest N entries) and a hook
+  // that forces one broker slot's JWT-renewal reconnect (?slot=1|2).
+  s_server.on("/api/heaplog", HTTP_GET, [](AsyncWebServerRequest* r) {
+    if (!auth_ok(r)) return;
+    int n = r->hasParam("n") ? r->getParam("n")->value().toInt() : 0;
+    const char* j = BotHeapLog::json(n);
+    if (!j) { r->send(503, "text/plain", "buffer unavailable"); return; }
+    r->send(200, "application/json", j);
+  });
+  // Last crash's ELF core dump from the coredump flash partition (raw image
+  // for `esp-coredump info_corefile -t raw -c <file> firmware.elf`); 404 if none.
+  s_server.on("/api/dev/coredump", HTTP_GET, [](AsyncWebServerRequest* r) {
+    if (!auth_ok(r)) return;
+    size_t addr = 0, size = 0;
+    if (esp_core_dump_image_get(&addr, &size) != ESP_OK || size == 0) {
+      r->send(404, "text/plain", "no core dump");
+      return;
+    }
+    AsyncWebServerResponse* resp = r->beginResponse("application/octet-stream", size,
+        [addr, size](uint8_t* out, size_t max_len, size_t index) -> size_t {
+          size_t n = size - index < max_len ? size - index : max_len;
+          if (n && esp_flash_read(esp_flash_default_chip, out, addr + index, n) != ESP_OK) return 0;
+          return n;
+        });
+    r->send(resp);
+  });
+  s_server.on("/api/dev/mqtt_renew", HTTP_GET, [](AsyncWebServerRequest* r) {
+    if (!auth_ok(r)) return;
+    int slot = r->hasParam("slot") ? r->getParam("slot")->value().toInt() : 0;
+    if (slot < 1 || slot > BotHeapLog::MQTT_SLOTS) { r->send(400, "text/plain", "slot=1|2"); return; }
+    the_mesh.mqtt().forceTokenRenewal(slot - 1);
+    r->send(200, "application/json", "{\"ok\":true}");
+  });
+#endif
 
   AsyncElegantOTA.begin(&s_server, BOT_WEB_USER, BOT_WEB_PASS);
   s_server.begin();

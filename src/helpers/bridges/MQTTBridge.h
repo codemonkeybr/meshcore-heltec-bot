@@ -128,6 +128,7 @@ private:
     int last_sock_errno;            // socket errno
     unsigned long last_error_time;  // millis() of last error
     uint32_t disconnect_count;      // Number of disconnect callbacks since boot
+    uint32_t renewal_reconnects;    // Proactive JWT-renewal bounces since boot
     unsigned long first_disconnect_time; // millis() of first disconnect after boot
 
     // Current-outage timer (used by AlertReporter to fire faults after a sustained
@@ -628,6 +629,19 @@ public:
   int getQueueSize() const;
   // Memory-pressure skip accounting: publishPacket() skips a publish while the
   // largest free heap block is below publishSkipThreshold().
+  // Per-slot reconnect accounting + a hook to force the JWT-renewal bounce now
+  // (sets the token as expired; maintainSlotConnection() then renews and
+  // reconnects on the bridge task exactly as the daily renewal does). Used to
+  // correlate heap fragmentation with reconnects. Out-of-range index -> 0/no-op.
+  uint32_t getSlotDisconnects(int index) const {
+    return (index >= 0 && index < RUNTIME_MQTT_SLOTS) ? _slots[index].disconnect_count : 0;
+  }
+  uint32_t getSlotRenewalReconnects(int index) const {
+    return (index >= 0 && index < RUNTIME_MQTT_SLOTS) ? _slots[index].renewal_reconnects : 0;
+  }
+  void expireSlotToken(int index) {
+    if (index >= 0 && index < RUNTIME_MQTT_SLOTS) _slots[index].token_expires_at = 1;
+  }
   unsigned long getPacketsSeen() const { return _packets_seen; }
   unsigned long getPacketsLostToPressure() const { return _packets_lost_pressure; }
   // Override with -D MQTT_PUBLISH_SKIP_THRESHOLD=<bytes>.

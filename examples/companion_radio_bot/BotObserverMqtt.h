@@ -48,4 +48,10 @@ public:
   unsigned long packetsSeen() const;
   unsigned long packetsLostToPressure() const;
   size_t skipThreshold() const;
+
+  // Per-broker-slot (0-based) reconnect counters and a hook that forces the
+  // JWT-renewal reconnect now (BOT_DEV_FEATURES heap-fragmentation probing).
+  uint32_t slotDisconnects(int slot) const;
+  uint32_t slotRenewalReconnects(int slot) const;
+  void forceTokenRenewal(int slot);
 };

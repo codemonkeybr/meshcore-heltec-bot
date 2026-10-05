@@ -4,6 +4,7 @@
 #include "GeoUtil.h"
 #include "HttpWorker.h"
 #include "BotWebUI.h"
+#include "BotHeapLog.h"
 #include "commands/Command.h"
 #include <WiFi.h>
 #include <string.h>
@@ -109,6 +110,9 @@ void BotMesh::begin(bool has_display) {
   }
 
   HttpWorker::instance().begin();
+#if BOT_DEV_FEATURES
+  BotHeapLog::begin();
+#endif
   {
     NodePrefs* np = getNodePrefs();
     _mqtt.begin(np ? np->node_name : getNodeName(), np ? np->freq : 0, np ? np->sf : 0,
@@ -168,6 +172,17 @@ void BotMesh::loop() {
   drainOutQueue();
   _store.loop(nowEpoch());
   _mqtt.loop();
+#if BOT_DEV_FEATURES
+  {
+    BotHeapLog::Counters hc;
+    for (int i = 0; i < BotHeapLog::MQTT_SLOTS; i++) {
+      hc.mqtt_dc[i] = _mqtt.slotDisconnects(i);
+      hc.mqtt_renew[i] = _mqtt.slotRenewalReconnects(i);
+    }
+    hc.replies = stats.replies;
+    BotHeapLog::loop(hc, uptimeSecs(), getRTCClock()->getCurrentTime());
+  }
+#endif
 #endif
 }
 

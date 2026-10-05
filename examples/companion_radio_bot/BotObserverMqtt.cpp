@@ -78,3 +78,6 @@ void BotObserverMqtt::statsReply(char* buf, size_t bufsize) const {
 unsigned long BotObserverMqtt::packetsSeen() const { return s_bridge ? s_bridge->getPacketsSeen() : 0; }
 unsigned long BotObserverMqtt::packetsLostToPressure() const { return s_bridge ? s_bridge->getPacketsLostToPressure() : 0; }
 size_t BotObserverMqtt::skipThreshold() const { return MQTTBridge::publishSkipThreshold(); }
+uint32_t BotObserverMqtt::slotDisconnects(int slot) const { return s_bridge ? s_bridge->getSlotDisconnects(slot) : 0; }
+uint32_t BotObserverMqtt::slotRenewalReconnects(int slot) const { return s_bridge ? s_bridge->getSlotRenewalReconnects(slot) : 0; }
+void BotObserverMqtt::forceTokenRenewal(int slot) { if (s_bridge) s_bridge->expireSlotToken(slot); }

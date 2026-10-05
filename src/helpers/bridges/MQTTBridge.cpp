@@ -2146,6 +2146,7 @@ void MQTTBridge::maintainSlotConnection(int index, unsigned long now_millis, uns
           slot.client->setCredentials(_jwt_username, slot.auth_token);
           slot.client->connect();  // restart stopped client; reconnect() fails silently on a stopped client
           reconnect_attempted = true;
+          slot.renewal_reconnects++;
           _last_slot_reconnect_ms = now_millis;
           MQTT_DEBUG_PRINTLN("MQTT%d int_heap=%d at token renewal reconnect", index + 1,
               (int)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));

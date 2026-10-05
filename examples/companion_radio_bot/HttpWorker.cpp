@@ -1,4 +1,5 @@
 #include "HttpWorker.h"
+#include "BotHeapLog.h"
 #include "BotDebug.h"
 #include "PsramJsonAlloc.h"
 #include <WiFi.h>
@@ -122,6 +123,9 @@ static const char* compass(double deg) {
 // If `filter` is non-null, only keys present in *filter are kept.
 static int fetch_json(const char* url, JsonDocument& doc, bool accept_json = true,
                       JsonDocument* filter = nullptr) {
+#if BOT_DEV_FEATURES
+  BotHeapLog::noteHttpFetch();
+#endif
   WiFiClientSecure client;
 #if BOT_HTTP_INSECURE
   client.setInsecure();
