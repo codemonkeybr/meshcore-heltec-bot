@@ -630,8 +630,11 @@ public:
   // largest free heap block is below publishSkipThreshold().
   unsigned long getPacketsSeen() const { return _packets_seen; }
   unsigned long getPacketsLostToPressure() const { return _packets_lost_pressure; }
+  // Override with -D MQTT_PUBLISH_SKIP_THRESHOLD=<bytes>.
   static size_t publishSkipThreshold() {
-#if defined(ESP32) && defined(BOARD_HAS_PSRAM)
+#if defined(MQTT_PUBLISH_SKIP_THRESHOLD)
+    return MQTT_PUBLISH_SKIP_THRESHOLD;
+#elif defined(ESP32) && defined(BOARD_HAS_PSRAM)
     return 16000;
 #else
     return 8000;
