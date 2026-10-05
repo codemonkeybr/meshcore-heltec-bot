@@ -80,6 +80,8 @@ static void status_json(char* buf, size_t bufsize) {
     BotHeapLog::heapInfo(&fb, &ab, &lg);
     replyAppendf(buf, bufsize, &pos, "\"int_free_blocks\":%lu,\"int_alloc_blocks\":%lu,",
                  (unsigned long)fb, (unsigned long)ab);
+    replyAppendf(buf, bufsize, &pos, "\"psram_free\":%lu,",
+                 (unsigned long)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     replyAppendf(buf, bufsize, &pos, "\"mqtt_dc\":[%lu,%lu],\"mqtt_renew\":[%lu,%lu],",
                  (unsigned long)the_mesh.mqtt().slotDisconnects(0), (unsigned long)the_mesh.mqtt().slotDisconnects(1),
                  (unsigned long)the_mesh.mqtt().slotRenewalReconnects(0), (unsigned long)the_mesh.mqtt().slotRenewalReconnects(1));
