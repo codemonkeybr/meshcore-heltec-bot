@@ -276,7 +276,8 @@ void BotMesh::onDiscoveredContact(ContactInfo& contact, bool is_new,
   bool has_loc = (contact.gps_lat != 0 || contact.gps_lon != 0);
   _store.noteNode(contact.id.pub_key, contact.name, contact.type,
                   contact.gps_lat, contact.gps_lon, has_loc,
-                  contact.last_advert_timestamp);
+                  contact.last_advert_timestamp,
+                  clockSynced() ? nowEpoch() : 0);   // live hearing, stamped on our NTP clock
 
 #if BOT_GREETER_ENABLED
   // Only a person's phone/app, never a repeater/room/sensor discovered via

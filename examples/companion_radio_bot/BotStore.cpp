@@ -5,7 +5,18 @@
 #include <string.h>
 
 #define CACHE_PATH "/botcache.bin"
-#define CACHE_MAGIC 0x42430004u    // "BC" v4 (NodeRec::name 17 -> 32)
+#define CACHE_MAGIC 0x42430005u    // "BC" v5 (added NodeRec::last_heard)
+#define CACHE_MAGIC_V4 0x42430004u // "BC" v4 (name 17 -> 32); still loadable, last_heard = 0
+
+// NodeRec as stored by v4 files, kept so an upgrade does not drop the cache.
+struct NodeRecV4 {
+  uint8_t  pubkey[6];
+  char     name[32];
+  int32_t  lat_e6, lon_e6;
+  uint32_t last_advert;
+  uint8_t  type;
+  uint8_t  used;
+};
 
 // Record table — file-static so it does not bloat the `the_mesh` global.
 static NodeRec s_recs[BOT_LOCCACHE_MAX];
@@ -28,12 +39,30 @@ void BotStore::begin() {
 
   uint32_t magic = 0;
   uint16_t n = 0;
-  bool ok = (f.read((uint8_t*)&magic, 4) == 4) && magic == CACHE_MAGIC &&
+  bool ok = (f.read((uint8_t*)&magic, 4) == 4) &&
+            (magic == CACHE_MAGIC || magic == CACHE_MAGIC_V4) &&
             (f.read((uint8_t*)&n, 2) == 2);
   if (ok) {
     if (n > BOT_LOCCACHE_MAX) n = BOT_LOCCACHE_MAX;
-    size_t want = (size_t)n * sizeof(NodeRec);
-    if (f.read((uint8_t*)s_recs, want) == (int)want) s_count = n;
+    if (magic == CACHE_MAGIC) {
+      size_t want = (size_t)n * sizeof(NodeRec);
+      if (f.read((uint8_t*)s_recs, want) == (int)want) s_count = n;
+    } else {
+      // v4 -> v5: widen each record; last_heard is unknown (0) until re-heard.
+      int got = 0;
+      NodeRecV4 old;
+      while (got < n && f.read((uint8_t*)&old, sizeof(old)) == (int)sizeof(old)) {
+        NodeRec& r = s_recs[got++];
+        memcpy(r.pubkey, old.pubkey, sizeof(r.pubkey));
+        memcpy(r.name, old.name, sizeof(r.name));
+        r.lat_e6 = old.lat_e6; r.lon_e6 = old.lon_e6;
+        r.last_advert = old.last_advert;
+        r.last_heard = 0;
+        r.type = old.type; r.used = old.used;
+      }
+      if (got == n) { s_count = n; _dirty = true; }   // rewrite as v5 on the next flush
+      else memset(s_recs, 0, sizeof(s_recs));
+    }
   }
   f.close();
   BOT_DEBUG_PRINTLN("store: loaded %d cached nodes", s_count);
@@ -60,26 +89,35 @@ void BotStore::loop(uint32_t /*now_epoch*/) {
   }
 }
 
+// Existing record for this key, else a free slot, else - table full - the node
+// we have gone longest without hearing. Ranked by last_heard (our clock); records
+// never heard live since the v5 upgrade (0) go first, oldest sender-clock first.
 static NodeRec* slotFor(const uint8_t pubkey[6]) {
   int lru = -1;
-  uint32_t lru_ts = 0xFFFFFFFFu;
   for (int i = 0; i < s_count; i++) {
-    if (s_recs[i].used && memcmp(s_recs[i].pubkey, pubkey, 6) == 0) return &s_recs[i];
-    if (s_recs[i].used && s_recs[i].last_advert < lru_ts) { lru_ts = s_recs[i].last_advert; lru = i; }
+    if (!s_recs[i].used) continue;
+    if (memcmp(s_recs[i].pubkey, pubkey, 6) == 0) return &s_recs[i];
+    if (lru < 0 || s_recs[i].last_heard < s_recs[lru].last_heard ||
+        (s_recs[i].last_heard == s_recs[lru].last_heard &&
+         s_recs[i].last_advert < s_recs[lru].last_advert)) lru = i;
   }
   if (s_count < BOT_LOCCACHE_MAX) return &s_recs[s_count++];
   return (lru >= 0) ? &s_recs[lru] : &s_recs[0];
 }
 
 void BotStore::noteNode(const uint8_t pubkey[], const char* name, uint8_t type,
-                        int32_t lat_e6, int32_t lon_e6, bool has_loc, uint32_t advert_ts) {
+                        int32_t lat_e6, int32_t lon_e6, bool has_loc, uint32_t advert_ts,
+                        uint32_t heard_epoch) {
   NodeRec* r = slotFor(pubkey);
+  // A replaced victim must not leak its location / timestamps into the new node.
+  if (!r->used || memcmp(r->pubkey, pubkey, 6) != 0) memset(r, 0, sizeof(*r));
   memcpy(r->pubkey, pubkey, 6);
   strncpy(r->name, name ? name : "", sizeof(r->name) - 1);
   r->name[sizeof(r->name) - 1] = '\0';
   r->type = type;
   if (has_loc && (lat_e6 != 0 || lon_e6 != 0)) { r->lat_e6 = lat_e6; r->lon_e6 = lon_e6; }
   if (advert_ts > r->last_advert) r->last_advert = advert_ts;
+  if (heard_epoch > r->last_heard) r->last_heard = heard_epoch;
   r->used = 1;
   _dirty = true;
 }

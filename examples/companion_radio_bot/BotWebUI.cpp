@@ -104,10 +104,10 @@ static void status_json(char* buf, size_t bufsize) {
 // name-resolution issues (e.g. two nodes sharing a 1-byte hop hash prefix) -
 // the same cache `path`/`prefix` resolve against, without needing a mesh
 // command relayed back by hand.
-// PSRAM-backed, allocated once in BotWebUI::begin() - 400 records * ~186B
-// worst case (escaped 31-char name + full lat/lon + hash + last_advert) fits
+// PSRAM-backed, allocated once in BotWebUI::begin() - 400 records * ~212B
+// worst case (escaped 31-char name + full lat/lon + hash + last_advert/heard) fits
 // comfortably with margin, so no truncation logic is needed.
-static const size_t NODES_JSON_BUF_SIZE = 81920;
+static const size_t NODES_JSON_BUF_SIZE = 98304;
 static char* s_nodes_json_buf = nullptr;
 
 static size_t nodes_json(char* buf, size_t bufsize) {
@@ -132,7 +132,8 @@ static size_t nodes_json(char* buf, size_t bufsize) {
     if (r->hasLoc())
       replyAppendf(buf, bufsize, &pos, ",\"lat\":%.6f,\"lon\":%.6f",
                   r->lat_e6 / 1e6, r->lon_e6 / 1e6);
-    replyAppendf(buf, bufsize, &pos, ",\"last_advert\":%u}", (unsigned)r->last_advert);
+    replyAppendf(buf, bufsize, &pos, ",\"last_advert\":%u,\"last_heard\":%u}",
+                (unsigned)r->last_advert, (unsigned)r->last_heard);
   }
   replyAppendf(buf, bufsize, &pos, "]}");
   return (size_t)pos;

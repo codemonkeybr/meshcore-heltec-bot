@@ -38,7 +38,7 @@
 
 // --- location cache (BotStore) ---------------------------------------
 #ifndef BOT_LOCCACHE_MAX
-#define BOT_LOCCACHE_MAX 400     // ~36 B/entry in RAM; persisted to SPIFFS
+#define BOT_LOCCACHE_MAX 400     // ~56 B/entry in RAM; persisted to SPIFFS; when full the least-recently-heard node is replaced
 #endif
 #ifndef BOT_LOCCACHE_FLUSH_SEC
 #define BOT_LOCCACHE_FLUSH_SEC 120

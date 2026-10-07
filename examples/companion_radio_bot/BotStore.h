@@ -11,7 +11,8 @@ struct NodeRec {
   uint8_t  pubkey[6];       // first 6 bytes of the public key (hop hash = pubkey[0])
   char     name[32];        // full advert name (MAX_ADVERT_DATA_SIZE)
   int32_t  lat_e6, lon_e6;  // 0,0 = unknown
-  uint32_t last_advert;     // sender's clock
+  uint32_t last_advert;     // sender's clock (can be wrong; not used for ageing)
+  uint32_t last_heard;      // OUR clock (NTP epoch) when we last received a live advert; 0 = unknown
   uint8_t  type;            // ADV_TYPE_*
   uint8_t  used;
 
@@ -27,8 +28,12 @@ public:
   void loop(uint32_t now_epoch);   // periodic flush
   void flush();                    // persist the cache to SPIFFS now
 
+  // heard_epoch: our clock at reception of a live advert; pass 0 when this isn't
+  // a live hearing (boot seeding from the contact table) or the clock isn't synced -
+  // an existing last_heard is then left untouched.
   void noteNode(const uint8_t pubkey[], const char* name, uint8_t type,
-                int32_t lat_e6, int32_t lon_e6, bool has_loc, uint32_t advert_ts);
+                int32_t lat_e6, int32_t lon_e6, bool has_loc, uint32_t advert_ts,
+                uint32_t heard_epoch = 0);
 
   int findByHash(const uint8_t* hash, uint8_t hash_len,
                  const NodeRec** out, int max_out) const;
