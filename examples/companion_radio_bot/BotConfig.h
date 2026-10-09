@@ -38,6 +38,9 @@
 
 // --- location cache (BotStore) ---------------------------------------
 #ifndef BOT_LOCCACHE_MAX
+#ifndef BOT_AGC_RESET_MS
+#define BOT_AGC_RESET_MS 300000  // 5 min; recovers a stuck -120 dB noise floor
+#endif
 #define BOT_LOCCACHE_MAX 400     // ~56 B/entry in RAM; persisted to SPIFFS; when full the least-recently-heard node is replaced
 #endif
 #ifndef BOT_LOCCACHE_FLUSH_SEC

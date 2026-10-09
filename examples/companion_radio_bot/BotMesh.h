@@ -64,6 +64,10 @@ protected:
   void logRx(mesh::Packet* packet, int len, float score) override;
   void logTx(mesh::Packet* packet, int len) override;
 
+  // Periodic AGC reset: also restarts noise-floor sampling, which otherwise can
+  // lock at -120 forever (samples must sit below floor+14) with nothing to undo it.
+  int getAGCResetInterval() const override { return BOT_AGC_RESET_MS; }
+
 private:
   bool gate(const BotMsg& msg, const uint8_t rl_key[4]);
   bool channelAllowed(uint8_t channel_idx);
