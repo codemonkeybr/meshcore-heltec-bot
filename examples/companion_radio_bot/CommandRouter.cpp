@@ -1,5 +1,6 @@
 #include "CommandRouter.h"
 #include "BotDebug.h"
+#include "BotSettings.h"
 #include "commands/Command.h"
 #include "commands/PingCommand.h"
 #include "commands/VersionCommand.h"
@@ -60,6 +61,7 @@ static Command* const kCommands[] = {
 void CommandRouter::begin() {
   _count = 0;
   for (Command* c : kCommands) {
+    if (BotSettings::commandDisabled(c->keyword())) continue;   // switched off in settings
     if (_count < MAX_COMMANDS) _cmds[_count++] = c;
   }
   BOT_DEBUG_PRINTLN("router: %d command(s) registered", _count);
@@ -70,4 +72,9 @@ Command* CommandRouter::match(const BotMsg& msg) const {
     if (_cmds[i]->matches(msg)) return _cmds[i];
   }
   return nullptr;
+}
+
+int CommandRouter::totalCommands() { return (int)(sizeof(kCommands) / sizeof(kCommands[0])); }
+const char* CommandRouter::commandKeyword(int i) {
+  return (i >= 0 && i < totalCommands()) ? kCommands[i]->keyword() : "";
 }

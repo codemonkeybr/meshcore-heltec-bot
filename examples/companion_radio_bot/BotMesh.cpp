@@ -5,6 +5,7 @@
 #include "HttpWorker.h"
 #include "BotWebUI.h"
 #include "BotWifi.h"
+#include "BotSettings.h"
 #include "BotHeapLog.h"
 #include "commands/Command.h"
 #include <WiFi.h>
@@ -201,7 +202,8 @@ bool BotMesh::selfLocation(double& lat, double& lon) {
   if (p && (p->node_lat != 0.0 || p->node_lon != 0.0)) {
     lat = p->node_lat; lon = p->node_lon; return true;
   }
-  if (BOT_LAT != 0.0 || BOT_LON != 0.0) { lat = BOT_LAT; lon = BOT_LON; return true; }
+  const BotSettings::Data& cfg = BotSettings::live();
+  if (cfg.lat != 0.0f || cfg.lon != 0.0f) { lat = cfg.lat; lon = cfg.lon; return true; }
   return false;
 }
 
@@ -290,7 +292,7 @@ void BotMesh::onDiscoveredContact(ContactInfo& contact, bool is_new,
 #if BOT_GREETER_ENABLED
   // Only a person's phone/app, never a repeater/room/sensor discovered via
   // the same advert traffic.
-  if (is_new && contact.type == ADV_TYPE_CHAT) {
+  if (is_new && contact.type == ADV_TYPE_CHAT && BotSettings::live().greeter) {
     unsigned long now = millis();
     if (s_last_self_advert_ms == 0 ||
         now - s_last_self_advert_ms >= BOT_GREETER_ADVERT_DEBOUNCE_MS) {
@@ -353,7 +355,7 @@ void BotMesh::sendDueGreetings() {
 // ---- gating ---------------------------------------------------------
 
 bool BotMesh::channelAllowed(uint8_t channel_idx) {
-  const char* allow = BOT_CHANNEL_ALLOWLIST;
+  const char* allow = BotSettings::live().allowlist;
   if (!allow || !*allow) return true;
 
   ChannelDetails ch;
@@ -374,7 +376,7 @@ bool BotMesh::channelAllowed(uint8_t channel_idx) {
 bool BotMesh::gate(const BotMsg& msg, const uint8_t rl_key[4]) {
   if (msg.is_channel) {
     if (!channelAllowed(msg.channel_idx)) { BOT_DEBUG_PRINTLN("gate: ch %u blocked", msg.channel_idx); return false; }
-  } else if (!BOT_ANSWER_DM) {
+  } else if (!BotSettings::live().answer_dm) {
     return false;
   }
   if (!_rl.allow(rl_key, msg.is_channel ? msg.channel_idx : 0xFF, millis())) {

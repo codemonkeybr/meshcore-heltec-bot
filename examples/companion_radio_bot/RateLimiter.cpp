@@ -1,14 +1,15 @@
 #include "RateLimiter.h"
+#include "BotSettings.h"
 #include <string.h>
 
 void RateLimiter::begin() {
-  _global.configure(BOT_RL_GLOBAL_PER_MIN, BOT_RL_GLOBAL_BURST);
-  for (auto& b : _channel) b.configure(BOT_RL_CHANNEL_PER_MIN, BOT_RL_CHANNEL_BURST);
+  _global.configure(BotSettings::live().rl_global, BOT_RL_GLOBAL_BURST);
+  for (auto& b : _channel) b.configure(BotSettings::live().rl_channel, BOT_RL_CHANNEL_BURST);
   for (auto& s : _senders) {
     s.used = false;
     s.last_seen = 0;
     memset(s.key, 0, sizeof(s.key));
-    s.bucket.configure(BOT_RL_SENDER_PER_MIN, BOT_RL_SENDER_BURST);
+    s.bucket.configure(BotSettings::live().rl_sender, BOT_RL_SENDER_BURST);
   }
 }
 
@@ -44,7 +45,7 @@ TokenBucket* RateLimiter::senderBucket(const uint8_t key[4], unsigned long now) 
   _senders[slot].used = true;
   memcpy(_senders[slot].key, key, 4);
   _senders[slot].last_seen = now;
-  _senders[slot].bucket.configure(BOT_RL_SENDER_PER_MIN, BOT_RL_SENDER_BURST);
+  _senders[slot].bucket.configure(BotSettings::live().rl_sender, BOT_RL_SENDER_BURST);
   return &_senders[slot].bucket;
 }
 

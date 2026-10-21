@@ -200,11 +200,13 @@ static void json_str(char* buf, size_t n, int* pos, const char* s) {
   replyAppendf(buf, n, pos, "\"");
 }
 
-static char s_scan_buf[2048];
+static char* s_scan_buf = nullptr;   // PSRAM, allocated only while setup is active
+static const size_t SCAN_BUF_SIZE = 2048;
 
 // Async scan: the first call starts it; the page polls until it completes.
 // Results are deduplicated by SSID (strongest wins), strongest first.
 static const char* scan_json() {
+  if (!s_scan_buf) return "{\"nets\":[]}";
   int c = WiFi.scanComplete();
   if (c == WIFI_SCAN_FAILED) {
     WiFi.scanNetworks(true);
@@ -215,7 +217,7 @@ static const char* scan_json() {
   if (c > 40) c = 40;
   bool used[40] = {false};
   int pos = 0;
-  replyAppendf(s_scan_buf, sizeof(s_scan_buf), &pos, "{\"nets\":[");
+  replyAppendf(s_scan_buf, SCAN_BUF_SIZE, &pos, "{\"nets\":[");
   int emitted = 0;
   for (int k = 0; k < 20; k++) {
     int best = -1;
@@ -226,13 +228,13 @@ static const char* scan_json() {
     if (best < 0) break;
     String name = WiFi.SSID(best);
     for (int i = 0; i < c; i++) if (WiFi.SSID(i) == name) used[i] = true;
-    if (emitted++) replyAppendf(s_scan_buf, sizeof(s_scan_buf), &pos, ",");
-    replyAppendf(s_scan_buf, sizeof(s_scan_buf), &pos, "{\"s\":");
-    json_str(s_scan_buf, sizeof(s_scan_buf), &pos, name.c_str());
-    replyAppendf(s_scan_buf, sizeof(s_scan_buf), &pos, ",\"r\":%d,\"o\":%s}", (int)WiFi.RSSI(best),
+    if (emitted++) replyAppendf(s_scan_buf, SCAN_BUF_SIZE, &pos, ",");
+    replyAppendf(s_scan_buf, SCAN_BUF_SIZE, &pos, "{\"s\":");
+    json_str(s_scan_buf, SCAN_BUF_SIZE, &pos, name.c_str());
+    replyAppendf(s_scan_buf, SCAN_BUF_SIZE, &pos, ",\"r\":%d,\"o\":%s}", (int)WiFi.RSSI(best),
                  WiFi.encryptionType(best) == WIFI_AUTH_OPEN ? "true" : "false");
   }
-  replyAppendf(s_scan_buf, sizeof(s_scan_buf), &pos, "]}");
+  replyAppendf(s_scan_buf, SCAN_BUF_SIZE, &pos, "]}");
   WiFi.scanDelete();
   return s_scan_buf;
 }
@@ -278,6 +280,7 @@ static void start_setup() {
   WiFi.softAP(s_ap_name, s_ap_pin, 1, 0, 4);
   IPAddress ip = WiFi.softAPIP();
 
+  s_scan_buf = (char*)ps_malloc(SCAN_BUF_SIZE);
   s_dns = new DNSServer();
   s_dns->start(53, "*", ip);
 

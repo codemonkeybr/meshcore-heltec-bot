@@ -1,5 +1,6 @@
 #include "Command.h"
 #include "../BotConfig.h"
+#include "../BotSettings.h"
 #include <string.h>
 #include <ctype.h>
 
@@ -10,8 +11,9 @@ static const char* skip_ws(const char* p) {
 
 // Advance past an optional leading command prefix (BOT_CMD_PREFIX).
 static const char* skip_prefix(const char* p) {
-  const size_t plen = sizeof(BOT_CMD_PREFIX) - 1;
-  if (plen && strncmp(p, BOT_CMD_PREFIX, plen) == 0) p += plen;
+  const char* prefix = BotSettings::live().cmd_prefix;
+  const size_t plen = strlen(prefix);
+  if (plen && strncmp(p, prefix, plen) == 0) p += plen;
   return p;
 }
 

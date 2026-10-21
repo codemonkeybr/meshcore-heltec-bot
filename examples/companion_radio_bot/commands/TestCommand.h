@@ -3,6 +3,7 @@
 #include "Command.h"
 #include "../BotMesh.h"
 #include "../BotConfig.h"
+#include "../BotSettings.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -58,7 +59,7 @@ public:
     char ts[9] = "--:--:--";
     uint32_t e = mesh.nowEpoch();
     if (e >= 1000000000UL) {
-      long local = (long)e + (long)BOT_TZ_OFFSET_MIN * 60;
+      long local = (long)e + (long)BotSettings::live().tz_min * 60;
       long tod = ((local % 86400) + 86400) % 86400;
       snprintf(ts, sizeof(ts), "%02ld:%02ld:%02ld", tod / 3600, (tod % 3600) / 60, tod % 60);
     }

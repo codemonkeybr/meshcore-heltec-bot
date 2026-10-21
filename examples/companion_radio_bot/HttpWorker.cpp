@@ -3,6 +3,7 @@
 #include "BotDebug.h"
 #include "PsramJsonAlloc.h"
 #include "BotWifi.h"
+#include "BotSettings.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -174,8 +175,8 @@ static void do_wx(const HttpJob& j, char* out, size_t n) {
     "wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure,dew_point_2m"
     "&temperature_unit=%s&wind_speed_unit=%s",
     j.lat, j.lon,
-    BOT_WX_METRIC ? "celsius" : "fahrenheit",
-    BOT_WX_METRIC ? "kmh" : "mph");
+    BotSettings::live().wx_metric ? "celsius" : "fahrenheit",
+    BotSettings::live().wx_metric ? "kmh" : "mph");
 
   JsonDocument doc(&s_json_alloc);
   int code = fetch_json(url, doc, false, nullptr);
@@ -191,7 +192,7 @@ static void do_wx(const HttpJob& j, char* out, size_t n) {
   double gust = c["wind_gusts_10m"] | 0.0;
   double dew = c["dew_point_2m"] | 0.0;
   double press = c["surface_pressure"] | 0.0;
-  const char* tu = BOT_WX_METRIC ? "C" : "F";
+  const char* tu = BotSettings::live().wx_metric ? "C" : "F";
 
   char desc[24];
   strlcpy(desc, wmo_desc(wc), sizeof(desc));

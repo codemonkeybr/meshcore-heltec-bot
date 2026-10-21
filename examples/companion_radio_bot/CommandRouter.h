@@ -16,6 +16,11 @@ public:
   Command* match(const BotMsg& msg) const;
 
   int count() const { return _count; }
+
+  // Every compiled-in command, including ones switched off in settings (the
+  // settings page lists these; count()/at() only cover the enabled ones).
+  static int totalCommands();
+  static const char* commandKeyword(int i);
   Command* at(int i) const { return (i >= 0 && i < _count) ? _cmds[i] : nullptr; }
 
 private:

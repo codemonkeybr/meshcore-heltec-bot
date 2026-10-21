@@ -4,6 +4,7 @@
 #include "../BotMesh.h"
 #include "../Almanac.h"
 #include "../BotConfig.h"
+#include "../BotSettings.h"
 
 // Moon phase / illumination / rise-set / next principal phases (no network).
 // Output mirrors the Python meshcore-bot's `moon` command.
@@ -20,7 +21,7 @@ public:
     if (!mesh.selfLocation(lat, lon)) { mesh.botReply(msg, "my location isn't set"); return; }
 
     MoonView m = computeMoonView(now, lat, lon);
-    const int tz = BOT_TZ_OFFSET_MIN;
+    const int tz = BotSettings::live().tz_min;
     char rise[16], set[16], full[16], neww[16];
     almanacFormatEvent(m.moonrise, tz, false, rise, sizeof(rise));
     almanacFormatEvent(m.moonset,  tz, false, set,  sizeof(set));

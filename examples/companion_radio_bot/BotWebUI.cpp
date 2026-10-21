@@ -5,6 +5,9 @@
 #include "BotStore.h"
 #include "BotHeapLog.h"
 #include "BotWifi.h"
+#include "BotSettings.h"
+#include "BotSettingsPage.h"
+#include "CommandRouter.h"
 #include "PsramJsonAlloc.h"
 #include "helpers/MQTTReplyFormat.h"
 #include <WiFi.h>
@@ -26,6 +29,74 @@ extern MESH_CLASS the_mesh;
 
 static AsyncWebServer s_server(80);
 static bool s_started = false;
+
+// ---- settings page ---------------------------------------------------------
+
+static bool s_name_changed = false;     // bot name edited this boot: re-advertises after a restart
+
+static void json_escape(char* buf, size_t n, int* pos, const char* s) {
+  replyAppendf(buf, n, pos, "\"");
+  for (; *s; s++) {
+    unsigned char c = (unsigned char)*s;
+    if (c == '"' || c == '\\') replyAppendf(buf, n, pos, "\\%c", c);
+    else if (c < 0x20)        replyAppendf(buf, n, pos, "\\u%04x", c);
+    else                      replyAppendf(buf, n, pos, "%c", c);
+  }
+  replyAppendf(buf, n, pos, "\"");
+}
+
+static void settings_json(char* b, size_t n) {
+  const BotSettings::Data& d = BotSettings::pending();
+  int pos = 0;
+  replyAppendf(b, n, &pos, "{\"name\":");
+  json_escape(b, n, &pos, the_mesh.getNodeName());
+  replyAppendf(b, n, &pos, ",\"lat\":%.5f,\"lon\":%.5f,\"tz_min\":%d,", (double)d.lat, (double)d.lon, (int)d.tz_min);
+  replyAppendf(b, n, &pos, "\"answer_dm\":%u,\"greeter\":%u,\"wx_metric\":%u,", d.answer_dm, d.greeter, d.wx_metric);
+  replyAppendf(b, n, &pos, "\"rl_global\":%u,\"rl_channel\":%u,\"rl_sender\":%u,", d.rl_global, d.rl_channel, d.rl_sender);
+  replyAppendf(b, n, &pos, "\"cmd_prefix\":");
+  json_escape(b, n, &pos, d.cmd_prefix);
+  replyAppendf(b, n, &pos, ",\"allowlist\":");
+  json_escape(b, n, &pos, d.allowlist);
+  replyAppendf(b, n, &pos, ",\"disabled_cmds\":");
+  json_escape(b, n, &pos, d.disabled_cmds);
+  replyAppendf(b, n, &pos, ",\"commands\":[");
+  for (int i = 0; i < CommandRouter::totalCommands(); i++) {
+    if (i) replyAppendf(b, n, &pos, ",");
+    json_escape(b, n, &pos, CommandRouter::commandKeyword(i));
+  }
+  replyAppendf(b, n, &pos, "],\"restart_needed\":%s}", (BotSettings::restartNeeded() || s_name_changed) ? "true" : "false");
+}
+
+static const char* const SETTING_KEYS[] = {
+  "lat", "lon", "tz_min", "answer_dm", "greeter", "wx_metric",
+  "rl_global", "rl_channel", "rl_sender", "cmd_prefix", "allowlist", "disabled_cmds",
+};
+
+static void settings_post(AsyncWebServerRequest* r) {
+  char err[96] = "";
+
+  if (r->hasParam("name", true)) {
+    const String& v = r->getParam("name", true)->value();
+    bool good = v.length() >= 1 && v.length() < 32;
+    for (size_t i = 0; good && i < v.length(); i++) if ((unsigned char)v[i] < 0x20) good = false;
+    if (!good) { r->send(400, "text/plain", "Bot name must be 1 to 31 characters."); return; }
+    NodePrefs* np = the_mesh.getNodePrefs();
+    if (np && strcmp(np->node_name, v.c_str()) != 0) {
+      strncpy(np->node_name, v.c_str(), sizeof(np->node_name) - 1);
+      np->node_name[sizeof(np->node_name) - 1] = '\0';
+      the_mesh.savePrefs();
+      s_name_changed = true;
+    }
+  }
+  for (const char* key : SETTING_KEYS) {
+    if (!r->hasParam(key, true)) continue;
+    if (!BotSettings::set(key, r->getParam(key, true)->value().c_str(), err, sizeof(err))) {
+      r->send(400, "text/plain", err);
+      return;
+    }
+  }
+  r->send(200, "application/json", "{\"ok\":true}");
+}
 
 static bool auth_ok(AsyncWebServerRequest* r) {
 #if BOT_DEV_FEATURES
@@ -158,7 +229,7 @@ a{color:#3fbaa3}
 <div class=w>
 <h1 id=name>D4rl3k</h1>
 <table id=t></table>
-<p><a href="/update">Firmware update (OTA)</a></p>
+<p><a href="/settings">Settings</a> &middot; <a href="/update">Firmware update (OTA)</a></p>
 <p style=color:#7d8a85>auto-refresh 3s</p>
 </div>
 <script>
@@ -212,6 +283,26 @@ void BotWebUI::begin() {
     char buf[STATUS_JSON_BUF_SIZE];
     status_json(buf, sizeof(buf));
     r->send(200, "application/json", buf);
+  });
+  s_server.on("/settings", HTTP_GET, [](AsyncWebServerRequest* r) {
+    if (!auth_ok(r)) return;
+    r->send(200, "text/html", SETTINGS_PAGE);
+  });
+  s_server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest* r) {
+    if (!auth_ok(r)) return;
+    char buf[1536];   // stack, like status_json: no permanent RAM for a rarely used page
+    settings_json(buf, sizeof(buf));
+    r->send(200, "application/json", buf);
+  });
+  s_server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest* r) {
+    if (!auth_ok(r)) return;
+    settings_post(r);
+  });
+  s_server.on("/api/reboot", HTTP_POST, [](AsyncWebServerRequest* r) {
+    if (!auth_ok(r)) return;
+    r->send(200, "application/json", "{\"ok\":true}");
+    delay(300);
+    ESP.restart();
   });
   // Forget the saved WiFi and reopen the setup AP (the config page will own a button for this).
   s_server.on("/api/wifi/forget", HTTP_POST, [](AsyncWebServerRequest* r) {

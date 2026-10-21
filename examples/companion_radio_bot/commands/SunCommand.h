@@ -3,6 +3,7 @@
 #include "Command.h"
 #include "../BotMesh.h"
 #include "../Almanac.h"
+#include "../BotSettings.h"
 #include "../BotConfig.h"
 
 // Sunrise / sunset / position for the bot's location (no network).
@@ -23,7 +24,7 @@ public:
     if (s.always_up)   { mesh.botReply(msg, "\xE2\x98\x80\xEF\xB8\x8F Sun Info: up all day here"); return; }
     if (s.always_down) { mesh.botReply(msg, "\xE2\x98\x80\xEF\xB8\x8F Sun Info: polar night, sun stays down"); return; }
 
-    const int tz = BOT_TZ_OFFSET_MIN;
+    const int tz = BotSettings::live().tz_min;
     char a[16], b[16];
     char out[BOT_MAX_REPLY_LEN + 1];
 
