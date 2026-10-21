@@ -83,9 +83,9 @@
 
 // --- channel allow-list ------------------------------------------------
 // Comma-separated channel names the bot will answer on. Empty = answer on any
-// configured channel. Case-sensitive, exact match.
+// configured channel. Case-sensitive, exact match. Default: only the #bot channel.
 #ifndef BOT_CHANNEL_ALLOWLIST
-#define BOT_CHANNEL_ALLOWLIST ""
+#define BOT_CHANNEL_ALLOWLIST "#bot"
 #endif
 
 // Whether the bot answers direct messages.

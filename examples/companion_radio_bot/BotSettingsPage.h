@@ -25,17 +25,22 @@ button{padding:12px 16px;border:0;border-radius:8px;background:#3fbaa3;color:#06
 button.g{background:#263230;color:#d6e2de}
 #bar{position:sticky;bottom:0;background:#0f1514;padding:12px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 #msg{flex:1;min-width:140px}.ok{color:#3fbaa3}.bad{color:#e07a7a}
-#rs{display:none;background:#2a2412;border:1px solid #5a4a1a;color:#e0c07a;border-radius:10px;padding:10px 14px;margin:12px 0}
-#rs button{margin-top:8px;background:#e0c07a;color:#2a2412}
+#rs{display:none;flex:1 1 100%;align-items:center;justify-content:space-between;gap:10px;background:#2a2412;border:1px solid #5a4a1a;color:#e0c07a;border-radius:10px;padding:8px 12px}
+#rs button{padding:8px 12px;background:#e0c07a;color:#2a2412;white-space:nowrap}
+#ov{display:none;position:fixed;inset:0;z-index:9;background:rgba(6,10,9,.88);align-items:center;justify-content:center;padding:16px}
+.oc{background:#162120;border:1px solid #2d3d3a;border-radius:14px;padding:24px 22px;max-width:360px;width:100%;text-align:center}
+.oc h2{margin:0 0 6px;font-size:1.1rem;letter-spacing:0;text-transform:none;color:#d6e2de}
+#on{font-size:3.2rem;font-weight:700;color:#3fbaa3;line-height:1.2;min-height:1.2em}
+#od{color:#9fb0aa;margin:6px 0 14px}
 </style>
 <div class=w>
 <p><a href="/">&larr; Status</a></p>
 <h1>Bot settings</h1>
-<div id=rs>Some changes only take effect after a restart.<br><button id=rb>Restart now</button></div>
 <div id=form></div>
 <div id=mq></div>
-<div id=bar><button id=save>Save</button><span id=msg></span></div>
+<div id=bar><div id=rs><span>Restart needed to apply your changes.</span><button id=rb>Restart now</button></div><button id=save>Save</button><span id=msg></span></div>
 </div>
+<div id=ov><div class=oc><h2 id=ot></h2><div id=on></div><p id=od></p><button id=oc class=g>Cancel</button></div></div>
 <script>
 const $=i=>document.getElementById(i);
 const S=[
@@ -48,7 +53,7 @@ const S=[
   ["answer_dm","Answer direct messages","sw",""],
   ["greeter","Greet new contacts","sw","Sends a welcome message the first time someone appears."],
   ["cmd_prefix","Command prefix","text","Optional, up to 3 characters (e.g. !). Leave empty for plain keywords."],
-  ["allowlist","Channels to answer on","text","Comma-separated channel names. Leave empty to answer on every channel."]]],
+  ["allowlist","Channels to answer on","text","Comma-separated channel names, exactly as they appear in your app. Default is #bot. Leave empty to answer on every channel."]]],
  ["Weather",[["wx_metric","Units","sel","",[["1","Metric (°C, km/h)"],["0","Imperial (°F, mph)"]]]]],
  ["Rate limits (replies per minute)",[
   ["rl_global","Whole bot","int","Total replies the bot may send per minute."],
@@ -157,10 +162,36 @@ function fill(d){
   $('f_rl_global').value=d.rl_global;$('f_rl_channel').value=d.rl_channel;$('f_rl_sender').value=d.rl_sender;
   const off=d.disabled_cmds.split(',');const g=$('cmds');g.textContent='';
   d.commands.forEach(k=>{const l=document.createElement('label');const cb=document.createElement('input');cb.type='checkbox';cb.dataset.k=k;cb.checked=!off.includes(k);l.append(cb,k);g.appendChild(l);});
-  $('rs').style.display=d.restart_needed?'block':'none';
 }
-async function load(){fill(await(await fetch('/api/settings')).json());M=await(await fetch('/api/mqtt/config')).json();fillMq();if(M.restart_needed)$('rs').style.display='block';mqStatus();}
+async function load(){fill(await(await fetch('/api/settings')).json());M=await(await fetch('/api/mqtt/config')).json();fillMq();setRs(needRestart());mqStatus();}
 function say(t,c){const m=$('msg');m.textContent=t;m.className=c||'';}
+function needRestart(){return !!(D.restart_needed||M.restart_needed);}
+function setRs(on){$('rs').style.display=on?'flex':'none';}
+let cd=null;
+function overlay(title,num,desc,cancel){
+  $('ot').textContent=title;$('on').textContent=num;$('od').textContent=desc;
+  $('oc').style.display=cancel?'':'none';$('ov').style.display='flex';
+}
+function countdown(n){
+  clearInterval(cd);
+  const draw=()=>overlay('Settings saved',String(n),'Restarting the bot in '+n+' second'+(n==1?'':'s')+' to apply them.',true);
+  draw();
+  cd=setInterval(()=>{n--;if(n<=0){clearInterval(cd);restart();}else draw();},1000);
+}
+$('oc').onclick=()=>{clearInterval(cd);$('ov').style.display='none';setRs(true);say('Saved. Restart when you are ready.','ok');};
+async function restart(){
+  clearInterval(cd);
+  overlay('Restarting the bot','\u2026','This takes about 20 seconds. You will be taken to the main page when it is back.',false);
+  try{await fetch('/api/reboot',{method:'POST'});}catch(e){}
+  let down=false;const t0=Date.now();
+  const iv=setInterval(async()=>{
+    let up=false;
+    try{const c=new AbortController(),to=setTimeout(()=>c.abort(),2500);const r=await fetch('/api/settings',{signal:c.signal,cache:'no-store'});clearTimeout(to);up=r.ok;}catch(e){}
+    if(!up)down=true;
+    $('on').textContent=Math.round((Date.now()-t0)/1000)+'s';
+    if((up&&down)||Date.now()-t0>90000){clearInterval(iv);location.href='/';}
+  },2000);
+}
 $('save').onclick=async()=>{
   const dis=[...document.querySelectorAll('#cmds input')].filter(x=>!x.checked).map(x=>x.dataset.k).join(',');
   const b=new URLSearchParams({
@@ -178,19 +209,17 @@ $('save').onclick=async()=>{
     b.set(pre+'port',$('m'+i+'_port').value);b.set(pre+'aud',$('m'+i+'_aud').value.trim());
     b.set(pre+'user',$('m'+i+'_user').value);b.set(pre+'pass',$('m'+i+'_pass').value);
   }
-  say('Saving...');
+  say('Saving...');$('save').disabled=true;
   try{
     const r=await fetch('/api/settings',{method:'POST',body:b});
     if(!r.ok){say(await r.text(),'bad');await load();return;}
-    say('Saved.','ok');await load();
+    await load();
+    if(needRestart()){say('Saved.','ok');countdown(5);}
+    else say('Saved. No restart needed.','ok');
   }catch(e){say('Could not reach the device.','bad');}
+  finally{$('save').disabled=false;}
 };
-$('rb').onclick=async()=>{
-  $('rb').disabled=true;
-  try{await fetch('/api/reboot',{method:'POST'});}catch(e){}
-  say('Restarting... this page reloads when the bot is back.');
-  const t=setInterval(async()=>{try{const r=await fetch('/api/settings');if(r.ok){clearInterval(t);location.reload();}}catch(e){}},3000);
-};
+$('rb').onclick=restart;
 (async()=>{build();buildMq();try{P=await(await fetch('/api/mqtt/presets')).json();}catch(e){}await load();setInterval(mqStatus,5000);})();
 </script>
 )HTML";
