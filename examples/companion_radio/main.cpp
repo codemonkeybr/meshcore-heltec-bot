@@ -38,6 +38,9 @@ MultiSerialInterface interface_manager;
 #endif
 
 // include wifi interface
+#ifdef BOT_WIFI_ONBOARDING
+  #include "BotWifi.h"
+#endif
 #ifdef WIFI_SSID
   #ifndef TCP_PORT
     #define TCP_PORT 5000
@@ -211,7 +214,11 @@ void setup() {
       }
   });
 
+#ifdef BOT_WIFI_ONBOARDING
+  BotWifi::begin();   // saved network, else the setup access point
+#else
   WiFi.begin(WIFI_SSID, WIFI_PWD);
+#endif
   wifi_interface.begin(TCP_PORT);
   interface_manager.addInterface(InterfaceType::WiFi, &wifi_interface);
 #endif
@@ -270,6 +277,9 @@ void loop() {
 
 #if defined(ESP32) && defined(WIFI_SSID)
   // Safely attempt to reconnect every 10 seconds if flagged
+#ifdef BOT_WIFI_ONBOARDING
+  if (BotWifi::setupActive()) wifi_needs_reconnect = false;   // setup owns the radio
+#endif
   if (wifi_needs_reconnect && (millis() - last_wifi_reconnect_attempt > 10000)) {
     WIFI_DEBUG_PRINTLN("Attempting manual WiFi reconnect...");
     WiFi.disconnect();

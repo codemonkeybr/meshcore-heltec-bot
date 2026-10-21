@@ -25,6 +25,7 @@ public:
             mesh::PacketManager* mgr, mesh::RTCClock* rtc, mesh::LocalIdentity* identity,
             mesh::Dispatcher* dispatcher, mesh::Radio* radio, mesh::MillisecondClock* ms);
   void loop();
+  void end();   // stop the uplink (tears down broker connections; blocks a few seconds)
 
   // Fed from BotMesh's logRx/logRxRaw overrides and its outbound send path.
   void onPacketReceived(mesh::Packet* pkt);

@@ -1,6 +1,7 @@
 #include "BotObserverMqtt.h"
 #include "BotConfig.h"
 #include "BotDebug.h"
+#include "BotWifi.h"
 #include "helpers/bridges/MQTTBridge.h"
 #include "helpers/MQTTDefaults.h"
 #include "target.h"   // extern HeltecV4Board board;
@@ -23,8 +24,8 @@ void BotObserverMqtt::begin(const char* node_name, float freq, uint8_t sf, uint8
   // Not covered by applyMQTTDefaults() - the bridge manages its own WiFi
   // station connection (falls back to a no-op if already connected, since
   // BotMesh's own WiFi.begin() in main.cpp already brought the link up).
-  strncpy(s_mqtt_prefs.wifi_ssid, WIFI_SSID, sizeof(s_mqtt_prefs.wifi_ssid) - 1);
-  strncpy(s_mqtt_prefs.wifi_password, WIFI_PWD, sizeof(s_mqtt_prefs.wifi_password) - 1);
+  strncpy(s_mqtt_prefs.wifi_ssid, BotWifi::ssid(), sizeof(s_mqtt_prefs.wifi_ssid) - 1);
+  strncpy(s_mqtt_prefs.wifi_password, BotWifi::password(), sizeof(s_mqtt_prefs.wifi_password) - 1);
 
   // Only used by MQTTBridge for status-text display (radio config, repeat
   // on/off) - never read for actual behavior, which stays governed by our own
@@ -54,6 +55,10 @@ void BotObserverMqtt::begin(const char* node_name, float freq, uint8_t sf, uint8
 
 void BotObserverMqtt::loop() {
   if (s_bridge) s_bridge->loop();
+}
+
+void BotObserverMqtt::end() {
+  if (s_bridge) s_bridge->end();
 }
 
 void BotObserverMqtt::onPacketReceived(mesh::Packet* pkt) {

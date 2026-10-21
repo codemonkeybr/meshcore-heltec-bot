@@ -4,6 +4,7 @@
 #include "BotDebug.h"
 #include "BotStore.h"
 #include "BotHeapLog.h"
+#include "BotWifi.h"
 #include "PsramJsonAlloc.h"
 #include "helpers/MQTTReplyFormat.h"
 #include <WiFi.h>
@@ -30,7 +31,7 @@ static bool auth_ok(AsyncWebServerRequest* r) {
 #if BOT_DEV_FEATURES
   BotHeapLog::noteWebRequest();
 #endif
-  if (r->authenticate(BOT_WEB_USER, BOT_WEB_PASS)) return true;
+  if (r->authenticate(BotWifi::webUser(), BotWifi::webPass())) return true;
   r->requestAuthentication();
   return false;
 }
@@ -198,7 +199,7 @@ tick();setInterval(tick,3000);
 )HTML";
 
 void BotWebUI::begin() {
-  if (s_started) return;
+  if (s_started || BotWifi::setupActive()) return;   // setup AP owns port 80
 
   if (!s_nodes_json_buf) s_nodes_json_buf = (char*)psram_malloc(NODES_JSON_BUF_SIZE);
 
@@ -211,6 +212,12 @@ void BotWebUI::begin() {
     char buf[STATUS_JSON_BUF_SIZE];
     status_json(buf, sizeof(buf));
     r->send(200, "application/json", buf);
+  });
+  // Forget the saved WiFi and reopen the setup AP (the config page will own a button for this).
+  s_server.on("/api/wifi/forget", HTTP_POST, [](AsyncWebServerRequest* r) {
+    if (!auth_ok(r)) return;
+    r->send(200, "application/json", "{\"ok\":true}");
+    BotWifi::forget();
   });
   s_server.on("/api/nodes", HTTP_GET, [](AsyncWebServerRequest* r) {
     if (!auth_ok(r)) return;
@@ -255,7 +262,7 @@ void BotWebUI::begin() {
   });
 #endif
 
-  AsyncElegantOTA.begin(&s_server, BOT_WEB_USER, BOT_WEB_PASS);
+  AsyncElegantOTA.begin(&s_server, BotWifi::webUser(), BotWifi::webPass());
   s_server.begin();
   s_started = true;
   BOT_DEBUG_PRINTLN("web UI on http://%s/", WiFi.localIP().toString().c_str());

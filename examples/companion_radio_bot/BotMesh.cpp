@@ -4,6 +4,7 @@
 #include "GeoUtil.h"
 #include "HttpWorker.h"
 #include "BotWebUI.h"
+#include "BotWifi.h"
 #include "BotHeapLog.h"
 #include "commands/Command.h"
 #include <WiFi.h>
@@ -65,7 +66,7 @@ static unsigned long s_clock_push_ms = 0;
 static const time_t CLOCK_SANE_EPOCH = 1735689600;   // 2025-01-01 UTC
 
 static void syncClockFromNTP(mesh::RTCClock* rtc) {
-  if (WiFi.status() != WL_CONNECTED) return;
+  if (WiFi.status() != WL_CONNECTED || BotWifi::setupActive()) return;
   if (!s_ntp_started) {
     configTime(0, 0, "pool.ntp.org", "time.nist.gov", "time.google.com");
     s_ntp_started = true;
@@ -131,6 +132,13 @@ const char* BotMesh::lastResetReason() { return reset_reason_str(s_reset); }
 bool BotMesh::clockSynced() { return s_clock_synced; }
 
 void BotMesh::loop() {
+  BotWifi::loop();
+  if (BotWifi::setupActive()) {
+    // Setup AP owns the radio: stop the MQTT uplink once (it would otherwise keep
+    // calling WiFi.begin() with the old credentials and fight the setup join).
+    static bool s_mqtt_stopped = false;
+    if (!s_mqtt_stopped) { s_mqtt_stopped = true; _mqtt.end(); }
+  }
   MyMesh::loop();
 #if BOT_ENABLED
   if (!s_crash_announced && uptimeSecs() >= 15) {
@@ -147,7 +155,7 @@ void BotMesh::loop() {
     }
   }
 
-  if (WiFi.status() == WL_CONNECTED) {
+  if (WiFi.status() == WL_CONNECTED && !BotWifi::setupActive()) {
     static bool s_wifi_sleep_disabled = false;
     if (!s_wifi_sleep_disabled) {
       // Power-save naps between beacon intervals add multi-second latency to the

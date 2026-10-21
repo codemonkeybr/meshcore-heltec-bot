@@ -2,6 +2,7 @@
 #include "BotHeapLog.h"
 #include "BotDebug.h"
 #include "PsramJsonAlloc.h"
+#include "BotWifi.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -313,7 +314,9 @@ void HttpWorker::taskLoop() {
     res.target = job.target;
     res.text[0] = '\0';
 
-    if (WiFi.status() != WL_CONNECTED) {
+    if (BotWifi::setupActive()) {
+      strlcpy(res.text, "offline - WiFi setup mode", sizeof(res.text));
+    } else if (WiFi.status() != WL_CONNECTED) {
       strlcpy(res.text, "offline - no WiFi", sizeof(res.text));
     } else {
       switch (job.kind) {

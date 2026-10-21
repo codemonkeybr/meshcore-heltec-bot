@@ -5,6 +5,9 @@
 #ifdef WIFI_SSID
   #include <WiFi.h>
 #endif
+#ifdef BOT_WIFI_ONBOARDING
+  #include "BotWifi.h"
+#endif
 
 #ifndef AUTO_OFF_MILLIS
   #define AUTO_OFF_MILLIS     15000   // 15 seconds
@@ -577,6 +580,36 @@ public:
   }
 };
 
+#ifdef BOT_WIFI_ONBOARDING
+// Shown while the WiFi setup access point is up: how to reach the setup page.
+class WifiSetupScreen : public UIScreen {
+public:
+  int render(DisplayDriver& display) override {
+    display.setTextSize(1);
+    display.setColor(UIColor::warning_txt);
+    display.drawTextCentered(display.width() / 2, 2, BotWifi::apName());
+    display.setColor(UIColor::secondary_txt);
+    display.drawTextCentered(display.width() / 2, 13, "WiFi password:");
+    display.setColor(UIColor::primary_txt);
+    display.setTextSize(2);
+    display.drawTextCentered(display.width() / 2, 24, BotWifi::apPin());
+    display.setTextSize(1);
+    const char* st = BotWifi::setupStatus();
+    if (st[0]) {
+      display.setColor(UIColor::warning_txt);
+      display.drawTextCentered(display.width() / 2, 54, st);
+    } else {
+      display.setColor(UIColor::secondary_txt);
+      display.drawTextCentered(display.width() / 2, 46, "Join it, then open");
+      display.setColor(UIColor::primary_txt);
+      display.drawTextCentered(display.width() / 2, 55, "192.168.4.1");
+    }
+    return 500;
+  }
+};
+static WifiSetupScreen s_wifi_setup_screen;
+#endif
+
 void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* node_prefs) {
   _display = display;
   _sensors = sensors;
@@ -820,6 +853,14 @@ void UITask::loop() {
 #endif
 
   if (curr) curr->poll();
+
+#ifdef BOT_WIFI_ONBOARDING
+  if (BotWifi::setupActive() && _display != NULL && millis() > ui_started_at + BOOT_SCREEN_MILLIS + 500) {
+    _auto_off = millis() + AUTO_OFF_MILLIS;   // keep the screen on: it carries the setup password
+    if (!_display->isOn()) _display->turnOn();
+    if (curr != &s_wifi_setup_screen) setCurrScreen(&s_wifi_setup_screen);
+  }
+#endif
 
   if (_display != NULL && _display->isOn()) {
     if (millis() >= _next_refresh && curr) {
