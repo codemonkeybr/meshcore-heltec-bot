@@ -34,7 +34,7 @@ button.g{background:#263230;color:#d6e2de}
 #od{color:#9fb0aa;margin:6px 0 14px}
 </style>
 <div class=w>
-<p><a href="/">&larr; Status</a></p>
+<p><a href="/">&larr; Status</a> &middot; <a href="/nodes">Nodes</a></p>
 <h1>Bot settings</h1>
 <div id=form></div>
 <div id=mq></div>

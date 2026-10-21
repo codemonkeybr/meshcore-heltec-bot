@@ -8,6 +8,7 @@
 #include "BotSettings.h"
 #include "BotMqttSettings.h"
 #include "BotSettingsPage.h"
+#include "BotNodesPage.h"
 #include "CommandRouter.h"
 #include "PsramJsonAlloc.h"
 #include "helpers/MQTTReplyFormat.h"
@@ -239,7 +240,7 @@ a{color:#3fbaa3}
 <div class=w>
 <h1 id=name>D4rl3k</h1>
 <table id=t></table>
-<p><a href="/settings">Settings</a> &middot; <a href="/update">Firmware update (OTA)</a></p>
+<p><a href="/nodes">Nodes</a> &middot; <a href="/settings">Settings</a> &middot; <a href="/update">Firmware update (OTA)</a></p>
 <p style=color:#7d8a85>auto-refresh 3s</p>
 </div>
 <script>
@@ -293,6 +294,10 @@ void BotWebUI::begin() {
     char buf[STATUS_JSON_BUF_SIZE];
     status_json(buf, sizeof(buf));
     r->send(200, "application/json", buf);
+  });
+  s_server.on("/nodes", HTTP_GET, [](AsyncWebServerRequest* r) {
+    if (!auth_ok(r)) return;
+    r->send(200, "text/html", NODES_PAGE);
   });
   s_server.on("/settings", HTTP_GET, [](AsyncWebServerRequest* r) {
     if (!auth_ok(r)) return;
