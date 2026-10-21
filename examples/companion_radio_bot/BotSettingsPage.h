@@ -38,6 +38,8 @@ button.g{background:#263230;color:#d6e2de}
 <h1>Bot settings</h1>
 <div id=form></div>
 <div id=mq></div>
+<h2>Firmware</h2>
+<p><a href="/update">Firmware update (OTA)</a> &mdash; upload a new firmware file.</p>
 <div id=bar><div id=rs><span>Restart needed to apply your changes.</span><button id=rb>Restart now</button></div><button id=save>Save</button><span id=msg></span></div>
 </div>
 <div id=ov><div class=oc><h2 id=ot></h2><div id=on></div><p id=od></p><button id=oc class=g>Cancel</button></div></div>

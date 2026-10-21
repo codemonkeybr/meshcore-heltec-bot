@@ -239,8 +239,8 @@ a{color:#3fbaa3}
 </style>
 <div class=w>
 <h1 id=name>D4rl3k</h1>
+<p><a href="/nodes">Nodes</a> &middot; <a href="/settings">Settings</a></p>
 <table id=t></table>
-<p><a href="/nodes">Nodes</a> &middot; <a href="/settings">Settings</a> &middot; <a href="/update">Firmware update (OTA)</a></p>
 <p style=color:#7d8a85>auto-refresh 3s</p>
 </div>
 <script>
