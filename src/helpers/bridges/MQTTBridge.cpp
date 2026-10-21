@@ -20,6 +20,9 @@
 #endif
 
 #ifdef ESP_PLATFORM
+// bot fork: ESP-IDF's built-in root-CA bundle verifier (the Arduino core ships a
+// different esp_crt_bundle.h that shadows the IDF one, so declare it directly).
+extern "C" esp_err_t esp_crt_bundle_attach(void *conf);
 #include <esp_wifi.h>
 #include <esp_heap_caps.h>
 #include <freertos/FreeRTOS.h>
@@ -1933,13 +1936,22 @@ bool MQTTBridge::setupSlot(int index) {
           s_ca_bundle_loaded = true;
         } else {
           MQTT_DEBUG_PRINTLN("MQTT%d TLS: no embedded cert bundle available", index + 1);
+          // bot fork: no src/certs bundle is embedded in this build, so a custom
+          // mqtts:// / wss:// broker would have no CA to verify against. Fall back to
+          // ESP-IDF's built-in Mozilla root bundle (CONFIG_MBEDTLS_CERTIFICATE_BUNDLE).
+          esp_mqtt_client_config_t* bcfg = slot.client->getMqttConfig();
+          #if ESP_IDF_VERSION_MAJOR == 5
+          bcfg->broker.verification.crt_bundle_attach = esp_crt_bundle_attach;
+          #else
+          bcfg->crt_bundle_attach = esp_crt_bundle_attach;
+          #endif
         }
       } else {
         // Global bundle already loaded — just attach the callback for this client.
         slot.client->attachArduinoCACertBundle(true);
       }
       MQTT_DEBUG_PRINTLN("MQTT%d TLS verify: CA bundle %s", index + 1,
-        s_ca_bundle_loaded ? "active" : "unavailable");
+        s_ca_bundle_loaded ? "active" : "IDF built-in bundle");
     } else {
       MQTT_DEBUG_PRINTLN("MQTT%d custom broker uses non-TLS transport", index + 1);
     }

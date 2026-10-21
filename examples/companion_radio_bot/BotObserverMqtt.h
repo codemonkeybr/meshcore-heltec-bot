@@ -55,4 +55,10 @@ public:
   uint32_t slotDisconnects(int slot) const;
   uint32_t slotRenewalReconnects(int slot) const;
   void forceTokenRenewal(int slot);
+
+  // Live state of one broker slot (0-based) for the settings page. False when the
+  // slot is unconfigured or the bridge isn't running. state: "ok" | "wait" | "fail" |
+  // "disc" | "inactive"; the strings are static.
+  bool slotStatus(int slot, const char** name, const char** state,
+                  unsigned long* publish_ok, unsigned long* publish_err) const;
 };

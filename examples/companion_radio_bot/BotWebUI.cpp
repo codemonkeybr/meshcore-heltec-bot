@@ -6,6 +6,7 @@
 #include "BotHeapLog.h"
 #include "BotWifi.h"
 #include "BotSettings.h"
+#include "BotMqttSettings.h"
 #include "BotSettingsPage.h"
 #include "CommandRouter.h"
 #include "PsramJsonAlloc.h"
@@ -64,7 +65,7 @@ static void settings_json(char* b, size_t n) {
     if (i) replyAppendf(b, n, &pos, ",");
     json_escape(b, n, &pos, CommandRouter::commandKeyword(i));
   }
-  replyAppendf(b, n, &pos, "],\"restart_needed\":%s}", (BotSettings::restartNeeded() || s_name_changed) ? "true" : "false");
+  replyAppendf(b, n, &pos, "],\"restart_needed\":%s}", (BotSettings::restartNeeded() || BotMqttSettings::restartNeeded() || s_name_changed) ? "true" : "false");
 }
 
 static const char* const SETTING_KEYS[] = {
@@ -86,6 +87,15 @@ static void settings_post(AsyncWebServerRequest* r) {
       np->node_name[sizeof(np->node_name) - 1] = '\0';
       the_mesh.savePrefs();
       s_name_changed = true;
+    }
+  }
+  // MQTT fields: everything the page posts that starts with "mqtt".
+  for (size_t i = 0; i < r->params(); i++) {
+    const AsyncWebParameter* ap = r->getParam(i);
+    if (!ap->isPost() || strncmp(ap->name().c_str(), "mqtt", 4) != 0) continue;
+    if (!BotMqttSettings::set(ap->name().c_str(), ap->value().c_str(), err, sizeof(err))) {
+      r->send(400, "text/plain", err);
+      return;
     }
   }
   for (const char* key : SETTING_KEYS) {
@@ -297,6 +307,40 @@ void BotWebUI::begin() {
   s_server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest* r) {
     if (!auth_ok(r)) return;
     settings_post(r);
+  });
+  s_server.on("/api/mqtt/config", HTTP_GET, [](AsyncWebServerRequest* r) {
+    if (!auth_ok(r)) return;
+    char buf[1280];
+    BotMqttSettings::configJson(buf, sizeof(buf));
+    r->send(200, "application/json", buf);
+  });
+  s_server.on("/api/mqtt/presets", HTTP_GET, [](AsyncWebServerRequest* r) {
+    if (!auth_ok(r)) return;
+    char buf[1792];
+    BotMqttSettings::presetsJson(buf, sizeof(buf));
+    r->send(200, "application/json", buf);
+  });
+  s_server.on("/api/mqtt/status", HTTP_GET, [](AsyncWebServerRequest* r) {
+    if (!auth_ok(r)) return;
+    char buf[400];
+    int pos = 0;
+    replyAppendf(buf, sizeof(buf), &pos, "{\"slots\":[");
+    for (int i = 0; i < BotMqttSettings::SLOTS; i++) {
+      const char *name, *state;
+      unsigned long ok, err;
+      if (i) replyAppendf(buf, sizeof(buf), &pos, ",");
+      if (the_mesh.mqtt().slotStatus(i, &name, &state, &ok, &err))
+        replyAppendf(buf, sizeof(buf), &pos, "{\"state\":\"%s\",\"ok\":%lu,\"err\":%lu}", state, ok, err);
+      else
+        replyAppendf(buf, sizeof(buf), &pos, "{\"state\":\"off\",\"ok\":0,\"err\":0}");
+    }
+    replyAppendf(buf, sizeof(buf), &pos, "]}");
+    r->send(200, "application/json", buf);
+  });
+  s_server.on("/api/mqtt/reset", HTTP_POST, [](AsyncWebServerRequest* r) {
+    if (!auth_ok(r)) return;
+    BotMqttSettings::reset();
+    r->send(200, "application/json", "{\"ok\":true}");
   });
   s_server.on("/api/reboot", HTTP_POST, [](AsyncWebServerRequest* r) {
     if (!auth_ok(r)) return;

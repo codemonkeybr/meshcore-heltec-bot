@@ -2,6 +2,7 @@
 #include "BotConfig.h"
 #include "BotDebug.h"
 #include "BotWifi.h"
+#include "BotMqttSettings.h"
 #include "helpers/bridges/MQTTBridge.h"
 #include "helpers/MQTTDefaults.h"
 #include "target.h"   // extern HeltecV4Board board;
@@ -26,6 +27,9 @@ void BotObserverMqtt::begin(const char* node_name, float freq, uint8_t sf, uint8
   // BotMesh's own WiFi.begin() in main.cpp already brought the link up).
   strncpy(s_mqtt_prefs.wifi_ssid, BotWifi::ssid(), sizeof(s_mqtt_prefs.wifi_ssid) - 1);
   strncpy(s_mqtt_prefs.wifi_password, BotWifi::password(), sizeof(s_mqtt_prefs.wifi_password) - 1);
+
+  // User-saved broker slots / location code / observer name (settings page).
+  BotMqttSettings::applyTo(&s_mqtt_prefs);
 
   // Only used by MQTTBridge for status-text display (radio config, repeat
   // on/off) - never read for actual behavior, which stays governed by our own
@@ -86,3 +90,14 @@ size_t BotObserverMqtt::skipThreshold() const { return MQTTBridge::publishSkipTh
 uint32_t BotObserverMqtt::slotDisconnects(int slot) const { return s_bridge ? s_bridge->getSlotDisconnects(slot) : 0; }
 uint32_t BotObserverMqtt::slotRenewalReconnects(int slot) const { return s_bridge ? s_bridge->getSlotRenewalReconnects(slot) : 0; }
 void BotObserverMqtt::forceTokenRenewal(int slot) { if (s_bridge) s_bridge->expireSlotToken(slot); }
+
+bool BotObserverMqtt::slotStatus(int slot, const char** name, const char** state,
+                                 unsigned long* publish_ok, unsigned long* publish_err) const {
+  MQTTBridge::SlotStatusSnapshot snap;
+  if (!MQTTBridge::getSlotStatusSnapshot(slot, &snap)) return false;
+  *name = snap.name;
+  *state = snap.state;
+  *publish_ok = snap.publish_ok;
+  *publish_err = snap.publish_err;
+  return true;
+}
