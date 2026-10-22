@@ -6,32 +6,37 @@
 static const char NODES_PAGE[] PROGMEM = R"HTML(<!doctype html><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
 <title>Nodes</title>
+<link rel=stylesheet href="/ui.css">
 <style>
-body{margin:0;background:#0f1514;color:#d6e2de;font:15px/1.4 system-ui,sans-serif}
-.w{max-width:640px;margin:0 auto;padding:16px 16px 48px}
-a{color:#3fbaa3}h1{font-size:1.25rem;margin:.4rem 0 .6rem}
-.top{position:sticky;top:0;background:#0f1514;padding:8px 0 10px;z-index:2}
-.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch}
-.tab{flex:none;padding:7px 12px;border-radius:999px;background:#162120;border:1px solid #263230;color:#9fb0aa;font-size:.88rem}
-.tab.on{background:#3fbaa3;border-color:#3fbaa3;color:#06201b;font-weight:600}
+.hist{display:flex;align-items:flex-end;gap:10px;height:96px;margin-top:4px}
+.hist div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;height:100%;font-size:.72rem;color:var(--mut);min-width:0}
+.hist b{display:block;width:100%;max-width:64px;border-radius:5px 5px 2px 2px;background:var(--acc);min-height:3px}
+.hist em{font-style:normal;color:var(--fg);font-variant-numeric:tabular-nums;font-size:.8rem}
+.bar{position:sticky;top:0;background:var(--bg);padding:10px 0 8px;z-index:2}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px}
+.tab{flex:none;padding:7px 14px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--mut);font-size:.88rem;font-weight:500}
+.tab.on{background:var(--acc);border-color:var(--acc);color:var(--ink);font-weight:600}
 .row{display:flex;gap:8px}
-input,select{box-sizing:border-box;padding:10px;background:#162120;color:inherit;border:1px solid #2d3d3a;border-radius:8px;font-size:1rem}
+input,select{padding:10px;background:var(--card);color:inherit;border:1px solid var(--line);border-radius:9px;font:inherit}
 input{flex:1;min-width:0}
-h2{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:#7d8a85;margin:1.4rem 0 .4rem}
-.n{background:#162120;border:1px solid #263230;border-radius:10px;padding:10px 12px;margin:6px 0;display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;align-items:center}
-.dot{width:10px;height:10px;border-radius:50%;background:#4a5552;grid-row:1/3}
-.dot.g{background:#3fbaa3}.dot.a{background:#e0c07a}
+h2{font-size:.76rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:1.4rem 0 .5rem}
+.ng{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr))}
+.n{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr auto;gap:3px 10px;align-items:center;min-width:0}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--line);grid-row:1/3}
+.dot.g{background:var(--acc)}.dot.a{background:var(--amb)}
 .nm{font-weight:600;overflow-wrap:anywhere}
-.ago{color:#d6e2de;font-variant-numeric:tabular-nums;text-align:right}
-.sub{color:#7d8a85;font-size:.82rem;grid-column:2/4}
-.sub span+span::before{content:" \00b7 "}
-.empty{color:#7d8a85;padding:18px 0;text-align:center}
-#foot{color:#7d8a85;font-size:.8rem;margin-top:16px}
+.ago{font-variant-numeric:tabular-nums;text-align:right;font-size:.88rem}
+.sub{color:var(--mut);font-size:.8rem;grid-column:2/4;display:flex;gap:4px 12px;flex-wrap:wrap;align-items:center}
+.dbar{display:inline-block;width:44px;height:5px;border-radius:3px;background:var(--line);vertical-align:middle;overflow:hidden;margin-left:6px}
+.dbar i{display:block;height:100%;background:var(--acc)}
+.empty{color:var(--mut);padding:18px 0;text-align:center}
+#foot{color:var(--mut);font-size:.8rem;margin-top:18px}
 </style>
 <div class=w>
-<p><a href="/">&larr; Status</a> &middot; <a href="/settings">Settings</a></p>
-<h1>Nodes</h1>
-<div class=top>
+<div class=top><div><h1>Nodes <span class=pill id=cnt>...</span></h1><div class=sb id=sb>&nbsp;</div></div>
+<nav class=nav><a href="/">Status</a><a class=on href="/nodes">Nodes</a><a href="/settings">Settings</a></nav></div>
+<div class=cd><h4>When nodes were last heard</h4><div class=hist id=hist></div></div>
+<div class=bar>
 <div class=tabs id=tabs></div>
 <div class=row><input id=q type=search placeholder="Search name or ID" autocomplete=off>
 <select id=sort><option value=heard>Last heard</option><option value=name>Name</option><option value=dist>Distance</option></select></div>
@@ -42,7 +47,7 @@ h2{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:#7d8a85;m
 <script>
 const $=i=>document.getElementById(i);
 const KINDS=[[1,'Companions'],[2,'Repeaters'],[3,'Rooms'],[4,'Sensors'],[0,'Other']];
-let N=[],now=0,me=null,tab='all';
+let N=[],now=0,me=null,tab='all',MAXD=50;
 const kindOf=t=>(t>=1&&t<=4)?t:0;
 function ago(s){
   if(s<45)return 'just now';
@@ -70,7 +75,7 @@ function card(n){
   const sub=document.createElement('span');sub.className='sub';
   const add=t=>{const s=document.createElement('span');s.textContent=t;sub.appendChild(s);return s;};
   add('ID '+n.hash.slice(0,2)).title='Repeaters appear in paths by this 1-byte ID. Full key prefix: '+n.hash;
-  if(n.dist!==null)add(n.dist<10?n.dist.toFixed(1)+' km':Math.round(n.dist)+' km');
+  if(n.dist!==null){const t=add(n.dist<10?n.dist.toFixed(1)+' km':Math.round(n.dist)+' km');const b=document.createElement('span');b.className='dbar';const f=document.createElement('i');f.style.width=Math.max(3,Math.min(100,n.dist/MAXD*100))+'%';b.appendChild(f);t.appendChild(b);}
   if(n.has_loc){const a=document.createElement('a');a.textContent='map';a.target='_blank';a.rel='noopener';a.href='https://www.openstreetmap.org/?mlat='+n.lat+'&mlon='+n.lon+'#map=14/'+n.lat+'/'+n.lon;const s=document.createElement('span');s.appendChild(a);sub.appendChild(s);}
   else add('no location');
   d.append(dot,nm,ag,sub);return d;
@@ -80,6 +85,14 @@ function cmp(){
   if(s=='name')return(a,b)=>(a.name||'').localeCompare(b.name||'');
   if(s=='dist')return(a,b)=>(a.dist===null)-(b.dist===null)||a.dist-b.dist;
   return(a,b)=>(a.age===null)-(b.age===null)||a.age-b.age;
+}
+function hist(){
+  const B=[['under 1 h',0],['1 to 6 h',0],['6 to 24 h',0],['older',0],['not heard live',0]];
+  N.forEach(n=>{B[n.age===null?4:n.age<3600?0:n.age<21600?1:n.age<86400?2:3][1]++;});
+  const mx=Math.max(1,...B.map(b=>b[1])),h=$('hist');h.textContent='';
+  B.forEach((b,i)=>{const d=document.createElement('div');const e=document.createElement('em');e.textContent=b[1];
+    const bar=document.createElement('b');bar.style.height=Math.round(b[1]/mx*62)+'px';if(i>=3)bar.style.opacity=i==3?.45:.22;
+    const l=document.createElement('span');l.textContent=b[0];d.append(e,bar,l);h.appendChild(d);});
 }
 function render(){
   const q=$('q').value.trim().toLowerCase();
@@ -95,7 +108,7 @@ function render(){
     const g=N.filter(n=>n.k==k&&match(n)).sort(cmp());
     if(!g.length)return;
     const h=document.createElement('h2');h.textContent=l+' ('+g.length+')';list.appendChild(h);
-    g.forEach(n=>list.appendChild(card(n)));shown+=g.length;
+    const gd=document.createElement('div');gd.className='ng';g.forEach(n=>gd.appendChild(card(n)));list.appendChild(gd);shown+=g.length;
   });
   if(!shown){const e=document.createElement('div');e.className='empty';e.textContent=N.length?'No matches.':'No nodes heard yet.';list.appendChild(e);}
 }
@@ -105,7 +118,7 @@ async function load(){
     now=st.clock;
     const p=(st.loc||'').split(',').map(parseFloat);
     me=(p.length==2&&(p[0]||p[1]))?p:null;
-    N=nd.nodes;prep();render();
+    N=nd.nodes;prep();MAXD=Math.max(10,...N.map(n=>n.dist||0));hist();$('cnt').textContent=nd.total+' known';$('sb').textContent='Updated '+new Date().toLocaleTimeString();render();
     $('foot').textContent=nd.total+' nodes in the bot\'s memory (oldest are replaced when it fills). Green = heard in the last hour, amber = last 24 h. "Not heard live" means known from the contact list only.';
   }catch(e){$('list').innerHTML='<div class=empty>Could not load nodes.</div>';}
 }

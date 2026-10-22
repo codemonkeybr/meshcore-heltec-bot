@@ -4,45 +4,55 @@
 static const char SETTINGS_PAGE[] PROGMEM = R"HTML(<!doctype html><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
 <title>Bot settings</title>
+<link rel=stylesheet href="/ui.css">
 <style>
-body{margin:0;background:#0f1514;color:#d6e2de;font:15px/1.45 system-ui,sans-serif}
-.w{max-width:520px;margin:0 auto;padding:16px 16px 48px}
-h1{font-size:1.25rem;margin:.4rem 0 .2rem}
-h2{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:#7d8a85;margin:1.6rem 0 .4rem}
-a{color:#3fbaa3}
-.card{background:#162120;border:1px solid #263230;border-radius:10px;padding:4px 14px}
-.f{padding:10px 0;border-bottom:1px solid #263230}.f:last-child{border-bottom:0}
-label{display:block;color:#9fb0aa;font-size:.85rem}
-input[type=text],input[type=number],select{width:100%;box-sizing:border-box;margin-top:4px;padding:10px;background:#0f1514;color:inherit;border:1px solid #2d3d3a;border-radius:8px;font-size:1rem}
-.h{color:#7d8a85;font-size:.8rem;margin-top:3px}
-.sw{display:flex;justify-content:space-between;align-items:center;gap:12px}
-.sw input{width:22px;height:22px;accent-color:#3fbaa3}
-.sl{border-top:1px solid #263230;padding:10px 0}.sl:first-child{border-top:0}
-.stt{font-size:.85rem;margin-top:6px;color:#7d8a85}.stt.ok{color:#3fbaa3}.stt.bad{color:#e07a7a}
-.cmds{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px 10px;padding:10px 0}
-.cmds label{display:flex;gap:8px;align-items:center;color:#d6e2de;font-size:.9rem}
-button{padding:12px 16px;border:0;border-radius:8px;background:#3fbaa3;color:#06201b;font-size:1rem;font-weight:600}
-button.g{background:#263230;color:#d6e2de}
-#bar{position:sticky;bottom:0;background:#0f1514;padding:12px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-#msg{flex:1;min-width:140px}.ok{color:#3fbaa3}.bad{color:#e07a7a}
-#rs{display:none;flex:1 1 100%;align-items:center;justify-content:space-between;gap:10px;background:#2a2412;border:1px solid #5a4a1a;color:#e0c07a;border-radius:10px;padding:8px 12px}
-#rs button{padding:8px 12px;background:#e0c07a;color:#2a2412;white-space:nowrap}
-#ov{display:none;position:fixed;inset:0;z-index:9;background:rgba(6,10,9,.88);align-items:center;justify-content:center;padding:16px}
-.oc{background:#162120;border:1px solid #2d3d3a;border-radius:14px;padding:24px 22px;max-width:360px;width:100%;text-align:center}
-.oc h2{margin:0 0 6px;font-size:1.1rem;letter-spacing:0;text-transform:none;color:#d6e2de}
-#on{font-size:3.2rem;font-weight:700;color:#3fbaa3;line-height:1.2;min-height:1.2em}
-#od{color:#9fb0aa;margin:6px 0 14px}
+h2{font-size:.76rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:0 0 .5rem}
+#form{display:grid;gap:18px 16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));align-items:start}
+section{margin-top:18px}#form section{margin-top:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:2px 14px}
+.f{padding:11px 0;border-bottom:1px solid var(--line)}.f:last-child{border-bottom:0}
+label{display:grid;grid-template-columns:1fr minmax(120px,44%);gap:4px 12px;align-items:center;font-weight:600}
+input[type=text],input[type=number],input[type=password],select{width:100%;padding:9px 10px;background:var(--bg);color:inherit;border:1px solid var(--line);border-radius:9px;font:inherit;font-weight:400}
+input:focus,select:focus{border-color:var(--acc);outline:0}
+.h{color:var(--mut);font-size:.8rem;margin-top:3px;font-weight:400}
+.f.sw{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:2px 12px}
+.f.sw .h{flex:1 1 100%;order:3;margin-top:0}
+input[type=checkbox]{appearance:none;-webkit-appearance:none;flex:none;width:42px;height:24px;border-radius:12px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+input[type=checkbox]::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.35);transition:left .15s}
+input[type=checkbox]:checked{background:var(--acc)}input[type=checkbox]:checked::after{left:21px}
+.rg{display:flex;align-items:center;gap:10px}
+input[type=range]{flex:1;min-width:0;accent-color:var(--acc);height:24px;margin:0}
+.rg output{min-width:2ch;text-align:right;font-weight:650;font-variant-numeric:tabular-nums}
+.sl{padding:12px 0;border-top:1px solid var(--line)}.sl:first-of-type{border-top:0}
+#mqc{display:grid;gap:0 24px;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr))}
+.stt{font-size:.85rem;margin-top:6px;color:var(--mut)}.stt.ok{color:var(--acc)}.stt.bad{color:var(--bad)}
+.cmds{display:flex;flex-wrap:wrap;gap:8px;padding:12px 0 4px}
+.cmds label{display:block;cursor:pointer}
+.cmds input{position:absolute;opacity:0;width:1px;height:1px}
+.cmds span{display:block;padding:6px 14px;border-radius:999px;border:1px solid var(--line);color:var(--mut);font-weight:500;font-size:.9rem;text-decoration:line-through}
+.cmds input:checked+span{background:color-mix(in srgb,var(--acc) 16%,transparent);border-color:color-mix(in srgb,var(--acc) 55%,transparent);color:var(--fg);text-decoration:none}
+.cmds input:focus-visible+span{outline:2px solid var(--acc);outline-offset:2px}
+.fw{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding:12px 0}
+.lnk{display:inline-block;padding:9px 16px;border-radius:9px;background:var(--line);color:var(--fg);font-weight:600}
+#bar{position:sticky;bottom:0;margin:22px -16px 0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--card);border-top:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+#msg{flex:1;min-width:120px;order:-1}.ok{color:var(--acc)}.bad{color:var(--bad)}
+#rs{display:none;flex:1 1 100%;order:-2;align-items:center;justify-content:space-between;gap:10px;background:color-mix(in srgb,var(--amb) 16%,var(--card));border:1px solid color-mix(in srgb,var(--amb) 45%,var(--line));color:var(--amb);border-radius:10px;padding:8px 12px}
+#rs button{padding:7px 12px;background:var(--amb);color:var(--card);white-space:nowrap}
+#ov{display:none;position:fixed;inset:0;z-index:9;background:rgba(6,10,9,.86);align-items:center;justify-content:center;padding:16px}
+.oc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px 22px;max-width:380px;width:100%;text-align:center}
+.oc h2{margin:0 0 6px;font-size:1.1rem;letter-spacing:0;text-transform:none;color:var(--fg)}
+#on{font-size:3.2rem;font-weight:700;color:var(--acc);line-height:1.2;min-height:1.2em}
+#od{color:var(--mut);margin:6px 0 14px}
 </style>
 <div class=w>
-<p><a href="/">&larr; Status</a> &middot; <a href="/nodes">Nodes</a></p>
-<h1>Bot settings</h1>
+<div class=top><div><h1>Settings <span class="pill w" id=pl style="display:none">Restart needed</span></h1><div class=sb>Changes apply after a restart.</div></div>
+<nav class=nav><a href="/">Status</a><a href="/nodes">Nodes</a><a class=on href="/settings">Settings</a></nav></div>
 <div id=form></div>
-<div id=mq></div>
-<h2>Firmware</h2>
-<p><a href="/update">Firmware update (OTA)</a> &mdash; upload a new firmware file.</p>
-<div id=bar><div id=rs><span>Restart needed to apply your changes.</span><button id=rb>Restart now</button></div><button id=save>Save</button><span id=msg></span></div>
+<section id=mq></section>
+<section><h2>Firmware</h2><div class=card><div class=fw><div><div style="font-weight:600" id=fv>Firmware</div><div class=h>Upload a new firmware file (.bin) to update the bot.</div></div><a class=lnk href="/update">Update firmware</a></div></div></section>
+<div id=bar><div id=rs><span>Restart needed to apply your changes.</span><button id=rb>Restart now</button></div><span id=msg></span><button id=save>Save</button></div>
 </div>
-<div id=ov><div class=oc><h2 id=ot></h2><div id=on></div><p id=od></p><button id=oc class=g>Cancel</button></div></div>
+<div id=ov><div class=oc><h2 id=ot></h2><div id=on></div><p id=od></p><button id=oc class=g2>Cancel</button></div></div>
 <script>
 const $=i=>document.getElementById(i);
 const S=[
@@ -69,13 +79,14 @@ function fld(label,el,hint){const d=document.createElement('div');d.className='f
 function buildMq(){
   const root=$('mq');root.textContent='';
   const h=document.createElement('h2');h.textContent='MQTT uplink';root.appendChild(h);
-  const note=document.createElement('div');note.className='h';note.style.marginBottom='6px';
+  const note=document.createElement('div');note.className='h';note.style.marginBottom='8px';
   note.textContent='Where this bot reports the packets it hears. A wrong broker only stops the uplink; the bot keeps answering commands. Changes apply after a restart.';
   root.appendChild(note);
   const c=document.createElement('div');c.className='card';
   const io=inp('m_iata','text');io.maxLength=4;io.style.textTransform='uppercase';
   c.appendChild(fld('Location code',io,'Your nearest airport code, 3 letters (e.g. YYC). Shown on the broker\'s map.'));
   c.appendChild(fld('Observer name',inp('m_origin','text'),'Optional. Leave empty to use the bot name.'));
+  const mc=document.createElement('div');mc.id='mqc';c.appendChild(mc);
   for(let i=1;i<=2;i++){
     const s=document.createElement('div');s.className='sl';
     const sel=document.createElement('select');sel.id='m'+i+'_preset';sel.onchange=()=>vis(i);
@@ -87,10 +98,10 @@ function buildMq(){
     s.appendChild(fld('Username',inp('m'+i+'_user','text')));
     s.appendChild(fld('Password',inp('m'+i+'_pass','password','')));
     const st=document.createElement('div');st.className='stt';st.id='m'+i+'_st';s.appendChild(st);
-    c.appendChild(s);
+    mc.appendChild(s);
   }
   root.appendChild(c);
-  const rb=document.createElement('button');rb.className='g';rb.style.marginTop='12px';rb.textContent='Reset MQTT to defaults';
+  const rb=document.createElement('button');rb.className='g2';rb.style.marginTop='12px';rb.textContent='Reset MQTT to defaults';
   rb.onclick=async()=>{if(!confirm('Reset all MQTT settings to the firmware defaults?'))return;await fetch('/api/mqtt/reset',{method:'POST'});await load();say('MQTT reset. Restart to apply.','ok');};
   root.appendChild(rb);
 }
@@ -131,7 +142,8 @@ async function mqStatus(){
 function build(){
   const f=$('form');f.textContent='';
   S.forEach(([title,fields])=>{
-    const h=document.createElement('h2');h.textContent=title;f.appendChild(h);
+    const sc=document.createElement('section');f.appendChild(sc);
+    const h=document.createElement('h2');h.textContent=title;sc.appendChild(h);
     const c=document.createElement('div');c.className='card';
     fields.forEach(([k,l,t,hint,opts])=>{
       const d=document.createElement('div');d.className='f';
@@ -140,20 +152,22 @@ function build(){
       else{
         const lb=document.createElement('label');lb.textContent=l;
         if(t=='sel'){el=document.createElement('select');opts.forEach(o=>{const op=document.createElement('option');op.value=o[0];op.textContent=o[1];el.appendChild(op);});}
-        else{el=document.createElement('input');el.type=(t=='text')?'text':'number';if(t=='num')el.step='any';if(t=='int'){el.min=1;el.max=60;}}
-        lb.appendChild(el);d.appendChild(lb);
+        else if(t=='int'){el=document.createElement('input');el.type='range';el.min=1;el.max=60;const o=document.createElement('output');el.oninput=()=>{o.textContent=el.value;};const w=document.createElement('div');w.className='rg';w.append(el,o);lb.appendChild(w);d.appendChild(lb);}
+        else{el=document.createElement('input');el.type=(t=='text')?'text':'number';if(t=='num')el.step='any';}
+        if(t!='int'){lb.appendChild(el);d.appendChild(lb);}
       }
       el.id='f_'+k;
       if(hint){const p=document.createElement('div');p.className='h';p.textContent=hint;d.appendChild(p);}
       c.appendChild(d);
     });
-    f.appendChild(c);
+    sc.appendChild(c);
   });
-  const h=document.createElement('h2');h.textContent='Commands';f.appendChild(h);
+  const sc=document.createElement('section');f.appendChild(sc);
+  const h=document.createElement('h2');h.textContent='Commands';sc.appendChild(h);
   const c=document.createElement('div');c.className='card';
   const g=document.createElement('div');g.className='cmds';g.id='cmds';c.appendChild(g);
-  const p=document.createElement('div');p.className='h';p.style.paddingBottom='10px';p.textContent='Untick a command to switch it off.';c.appendChild(p);
-  f.appendChild(c);
+  const p=document.createElement('div');p.className='h';p.style.paddingBottom='10px';p.textContent='Tap a command to switch it off. Struck-through commands are off.';c.appendChild(p);
+  sc.appendChild(c);
 }
 function fill(d){
   D=d;
@@ -163,12 +177,14 @@ function fill(d){
   $('f_wx_metric').value=String(d.wx_metric);
   $('f_rl_global').value=d.rl_global;$('f_rl_channel').value=d.rl_channel;$('f_rl_sender').value=d.rl_sender;
   const off=d.disabled_cmds.split(',');const g=$('cmds');g.textContent='';
-  d.commands.forEach(k=>{const l=document.createElement('label');const cb=document.createElement('input');cb.type='checkbox';cb.dataset.k=k;cb.checked=!off.includes(k);l.append(cb,k);g.appendChild(l);});
+  d.commands.forEach(k=>{const l=document.createElement('label');const cb=document.createElement('input');cb.type='checkbox';cb.dataset.k=k;cb.checked=!off.includes(k);const sp=document.createElement('span');sp.textContent=k;l.append(cb,sp);g.appendChild(l);});
+  document.querySelectorAll('input[type=range]').forEach(e=>e.oninput());
 }
+async function ver(){try{$('fv').textContent='Firmware '+(await(await fetch('/api/status')).json()).version;}catch(e){}}
 async function load(){fill(await(await fetch('/api/settings')).json());M=await(await fetch('/api/mqtt/config')).json();fillMq();setRs(needRestart());mqStatus();}
 function say(t,c){const m=$('msg');m.textContent=t;m.className=c||'';}
 function needRestart(){return !!(D.restart_needed||M.restart_needed);}
-function setRs(on){$('rs').style.display=on?'flex':'none';}
+function setRs(on){$('rs').style.display=on?'flex':'none';$('pl').style.display=on?'inline-block':'none';}
 let cd=null;
 function overlay(title,num,desc,cancel){
   $('ot').textContent=title;$('on').textContent=num;$('od').textContent=desc;
@@ -222,6 +238,6 @@ $('save').onclick=async()=>{
   finally{$('save').disabled=false;}
 };
 $('rb').onclick=restart;
-(async()=>{build();buildMq();try{P=await(await fetch('/api/mqtt/presets')).json();}catch(e){}await load();setInterval(mqStatus,5000);})();
+(async()=>{build();buildMq();ver();try{P=await(await fetch('/api/mqtt/presets')).json();}catch(e){}await load();setInterval(mqStatus,5000);})();
 </script>
 )HTML";

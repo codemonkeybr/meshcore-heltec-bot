@@ -9,6 +9,7 @@
 #include "BotMqttSettings.h"
 #include "BotSettingsPage.h"
 #include "BotNodesPage.h"
+#include "BotUiCss.h"
 #include "CommandRouter.h"
 #include "PsramJsonAlloc.h"
 #include "helpers/MQTTReplyFormat.h"
@@ -224,59 +225,116 @@ static size_t nodes_json(char* buf, size_t bufsize) {
 
 static const char PAGE[] = R"HTML(<!doctype html><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
-<title>D4rl3k</title>
-<style>
-body{font:14px/1.5 system-ui,sans-serif;margin:0;background:#0e1413;color:#dfe5e2}
-.w{max-width:640px;margin:0 auto;padding:1.4rem}
-h1{font-size:1.2rem;margin:0 0 1rem;color:#3fbaa3}
-table{width:100%;border-collapse:collapse}
-td{padding:.35rem .2rem;border-bottom:1px solid #263230}
-td:first-child{color:#7d8a85;width:40%}
-td:last-child{font-variant-numeric:tabular-nums}
-a{color:#3fbaa3}
-.bad{color:#e07a7a}
-.warn{color:#e0c07a}
-</style>
+<title>Bot status</title>
+<link rel=stylesheet href="/ui.css">
 <div class=w>
-<h1 id=name>D4rl3k</h1>
-<p><a href="/nodes">Nodes</a> &middot; <a href="/settings">Settings</a></p>
-<table id=t></table>
-<p style=color:#7d8a85>auto-refresh 3s</p>
-</div>
+<div class=top><div><h1><span id=name>Bot</span><span class=pill id=pill>...</span></h1><div class=sb id=sub>&nbsp;</div></div>
+<nav class=nav><a class=on href="/">Status</a><a href="/nodes">Nodes</a><a href="/settings">Settings</a></nav></div>
+<div class=kp id=kp></div>
+<div class=g>
+<div class=cd><h4>Memory <span>internal heap</span></h4><div id=mem></div></div>
+<div class=cd><h4>Traffic <span>since boot</span></h4><div id=trf></div></div>
+<div class=cd><h4>MQTT brokers</h4><div id=brk><span class=mut>Loading...</span></div></div>
+<div class=cd><h4>Node memory <span id=ncount></span></h4><div id=nodes><span class=mut>Loading...</span></div></div>
+<div class="cd sp2"><h4>Details <span>refreshes every 3 s</span></h4><div class=kv id=kv></div></div>
+</div></div>
 <script>
-const rows=[["version","version",v=>v],
-["uptime","uptime_s",v=>{let s=v|0,d=s/86400|0,h=s%86400/3600|0,m=s%3600/60|0;return `${d}d ${h}h ${m}m`}],
-["free heap","heap_free",v=>(v/1024|0)+" k"],["min heap","heap_min",v=>(v/1024|0)+" k"],
-["last reset","reset",v=>v],
-["clock (UTC)","_clock",d=>new Date(d.clock*1000).toISOString().slice(0,19).replace("T"," ")+(d.clock_ntp?" (NTP)":" (no NTP)")],
-["wifi","wifi_rssi",v=>v+" dBm"],["ip","ip",v=>v],
-["cached nodes","cache_nodes",v=>v],["lora","lora",v=>v],["location","loc",v=>v],
-["msgs seen","msgs",v=>v],["matched","matched",v=>v],["replies sent","replies",v=>v],
-["drop rate/gap/full","_drop",d=>`${d.drop_rate}/${d.drop_gap}/${d.drop_full}`],
-["send fail","send_fail",v=>v],
-["mqtt","_mqtt",d=>d.mqtt_ready?`up · ${d.mqtt_brokers} broker${d.mqtt_brokers==1?"":"s"}`:"down"],
-["mqtt stats","mqtt_stats",v=>v]];
-)HTML"
-#if BOT_DEV_FEATURES
-R"HTML(rows.push(
-["mqtt loss","_loss",d=>d.mqtt_pkts?`${(100*d.mqtt_lost/d.mqtt_pkts).toFixed(2)}% (${d.mqtt_lost} / ${d.mqtt_pkts})`:"-"],
-["heap headroom","_room",d=>`${d.mqtt_max_alloc-d.mqtt_skip_threshold} B`]);
-)HTML"
-#endif
-R"HTML(
+const $=i=>document.getElementById(i);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const MAXH=300,heap=[],pk=[];let last=null,names=[],bk=[],tp=null;
+function sp(v,w,h,o){o=o||{};
+ const mn=o.min!=null?o.min:Math.min(...v),mx=o.max!=null?o.max:Math.max(...v);
+ const x=i=>3+i*(w-6)/Math.max(1,v.length-1),y=a=>h-4-(a-mn)/((mx-mn)||1)*(h-8);
+ const d=v.map((a,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(a).toFixed(1)).join('');
+ let s=`<svg class=sp viewBox="0 0 ${w} ${h}" role=img aria-label="${o.l||'trend'}">`;
+ for(let g=1;g<3;g++)s+=`<line class=gd x1=0 x2=${w} y1=${h*g/3} y2=${h*g/3}></line>`;
+ if(o.t!=null&&o.t>=mn&&o.t<=mx)s+=`<line class=th x1=0 x2=${w} y1=${y(o.t)} y2=${y(o.t)}></line>`;
+ return s+`<path class=ar d="${d}L${x(v.length-1)} ${h}L${x(0)} ${h}Z"></path><path class=ln d="${d}"></path><circle class=dt cx=${x(v.length-1)} cy=${y(v[v.length-1])} r=3.2></circle></svg>`;
+}
+function sig(n){let s='<svg class=sg width=16 height=12 viewBox="0 0 16 12" aria-hidden=true>';for(let i=0;i<4;i++)s+=`<rect class="${i<n?'f':''}" x=${i*4.2} y=${12-(i+1)*3} width=3 height=${(i+1)*3} rx=1></rect>`;return s+'</svg>'}
+const k1=v=>(v/1024).toFixed(1);
+function upt(s){s|=0;const d=s/86400|0,h=s%86400/3600|0,m=s%3600/60|0;return d?`${d} d ${h} h ${m} m`:`${h} h ${m} m`}
+function tile(l,v,s,c){return `<div class="k ${c||''}"><div class=l>${l}</div><div class=v>${v}</div><div class=s>${s}</div></div>`}
+function render(d){
+ document.title=d.name;$('name').textContent=d.name;
+ const bad=d.reset!=="clean"||d.send_fail>0||!d.mqtt_ready;
+ const p=$('pill');p.textContent=bad?"Check":"Online";p.className="pill"+(bad?" w":"");
+ $('sub').textContent=`v${d.version} · up ${upt(d.uptime_s)} · ${d.reset==="clean"?"clean boot":"last reset: "+d.reset}`;
+ const q=d.wifi_rssi,sg=q>-55?4:q>-67?3:q>-75?2:1,lo=(d.lora||"").split(" ");
+ $('kp').innerHTML=tile("WiFi",sig(sg)+q,"dBm · "+esc(d.ip),sg<2?"warn":"")
+  +tile("MQTT",d.mqtt_ready?d.mqtt_brokers+" up":"down","brokers",d.mqtt_ready?"":"bad")
+  +tile("Radio",esc((lo[0]||"?").replace("MHz","")),"MHz · "+esc(lo.slice(1).join(" ")))
+  +tile("Uptime",upt(d.uptime_s),d.clock_ntp?"clock synced":"no NTP",d.clock_ntp?"":"warn")
+  +tile("Replies",d.replies,"of "+d.msgs+" messages heard")
+  +tile("Nodes",d.cache_nodes,"remembered");
+ // memory
+ const mx=Math.max(32768,d.heap_free*1.15),thr=d.mqtt_skip_threshold,blk=d.mqtt_max_alloc;
+ let m=`<div class=big>${k1(d.heap_free)}<small>k free</small></div><div class=mt><i style="width:${d.heap_free/mx*100}%"></i>`;
+ if(blk)m=m.replace('<i style','<i class=b style="width:'+blk/mx*100+'%"></i><i style');
+ if(thr)m+=`<u style="left:${thr/mx*100}%"></u>`;
+ m+=`</div><div class=ax><span>0</span><span>${k1(mx/2)} k</span><span>${k1(mx)} k</span></div><div class=lg>`;
+ if(blk)m+=`<span><i class=sw8 style="background:color-mix(in srgb,var(--acc) 45%,var(--card))"></i>largest block <b>${k1(blk)} k</b></span>`;
+ if(thr)m+=`<span><i class=sw8 style="background:var(--amb)"></i>MQTT pauses below <b>${k1(thr)} k</b></span>`;
+ m+=`<span>lowest since boot <b>${k1(d.heap_min)} k</b></span></div>`;
+ if(heap.length>3)m+=sp(heap,300,64,{min:0,max:mx/1024,t:thr?thr/1024:null,l:'free heap'})+`<div class=ax><span>${Math.round(heap.length*3/60)} min ago</span><span>since you opened this page</span><span>now</span></div>`;
+ $('mem').innerHTML=m;
+ // traffic
+ const hd=d.msgs,mt=d.matched,rp=d.replies;
+ let t=`<div class=big>${rp}<small>replies sent</small></div><div class=fn><i style="flex:${Math.max(0,hd-mt)};background:var(--line)"></i><i style="flex:${Math.max(0,mt-rp)};background:color-mix(in srgb,var(--acc) 55%,var(--card))"></i><i style="flex:${rp};background:var(--acc)"></i></div>`;
+ t+=`<div class=lg><span>heard <b>${hd}</b></span><span>matched <b>${mt}</b></span><span>replied <b>${rp}</b></span><span>send failures <b>${d.send_fail}</b></span></div>`;
+ if(d.mqtt_pkts!==undefined){
+  t+=`<div class=lg><span>radio packets seen <b>${d.mqtt_pkts}</b></span></div>`;
+  if(pk.length>3)t+=sp(pk,300,48,{min:0,l:'packets per minute'})+`<div class=ax><span>packets / minute</span><span>now ${Math.round(pk[pk.length-1])}</span></div>`;
+ }
+ $('trf').innerHTML=t;
+ // details
+ const row=(a,b,c)=>`<div><span>${a}</span><span${c?' class='+c:''}>${b}</span></div>`;
+ let kv=row("Version",esc(d.version))+row("Last reset",esc(d.reset),d.reset!=="clean"?"bad":"")
+  +row("Clock (UTC)",new Date(d.clock*1000).toISOString().slice(0,19).replace("T"," ")+(d.clock_ntp?" (NTP)":" (no NTP)"))
+  +row("IP address",esc(d.ip))+row("LoRa",esc(d.lora))+row("Location",esc(d.loc))
+  +row("Drops (rate / gap / full)",`${d.drop_rate} / ${d.drop_gap} / ${d.drop_full}`)
+  +row("Send failures",d.send_fail,d.send_fail>0?"bad":"")+row("MQTT",d.mqtt_ready?`up, ${d.mqtt_brokers} broker${d.mqtt_brokers==1?"":"s"}`:"down",d.mqtt_ready?"":"bad")
+  +row("MQTT stats",esc(d.mqtt_stats));
+ if(d.mqtt_pkts!==undefined){
+  const room=d.mqtt_max_alloc-d.mqtt_skip_threshold;
+  kv+=row("MQTT loss",d.mqtt_pkts?`${(100*d.mqtt_lost/d.mqtt_pkts).toFixed(2)}% (${d.mqtt_lost} / ${d.mqtt_pkts})`:"-",d.mqtt_pkts&&d.mqtt_lost*100>=d.mqtt_pkts?"bad":"")
+   +row("Heap headroom",room+" B",room<0?"bad":room<1024?"warn":"");
+ }
+ $('kv').innerHTML=kv;
+}
+function brokers(){
+ $('brk').innerHTML=bk.map((s,i)=>{
+  const T={ok:"Connected",wait:"Waiting for settings",fail:"Failed to connect",disc:"Connecting...",off:"Not running",inactive:"Off"};
+  const c=s.state=="ok"?"":s.state=="fail"?"b":(s.state=="inactive"||s.state=="off")?"o":"w";
+  return `<div class=bk><span class="d ${c}"></span><span class=nm>${esc(names[i]||"Broker "+(i+1))}</span><span class=sn>${s.ok}</span><span class=sm>${T[s.state]||esc(s.state)} · ${s.err} errors</span></div>`}).join("")||'<span class=mut>None</span>';
+}
+function nodes(list,total){
+ const c=[0,0,0,0,0];list.forEach(n=>c[n.type>=1&&n.type<=4?n.type:0]++);
+ const col=["var(--line)","var(--acc)","color-mix(in srgb,var(--acc) 55%,var(--card))","var(--amb)","var(--mut)"],lb=["other","companions","repeaters","rooms","sensors"];
+ $('ncount').textContent=total+" nodes";
+ $('nodes').innerHTML=`<div class=fn>${c.map((n,i)=>`<i style="flex:${n};background:${col[i]}"></i>`).join("")}</div><div class=lg>${[1,2,3,4,0].filter(i=>c[i]).map(i=>`<span><i class=sw8 style="background:${col[i]}"></i>${lb[i]} <b>${c[i]}</b></span>`).join("")}</div><p class=mut style="margin:10px 0 0;font-size:.85rem">See the <a href="/nodes">Nodes page</a> for the full list.</p>`;
+}
 async function tick(){
  try{
-  let d=await (await fetch("/api/status")).json();
-  document.getElementById("name").textContent=d.name;
-  document.getElementById("t").innerHTML=rows.map(([k,f,fn])=>{
-   let v=f[0]==="_"?fn(d):fn(d[f]);
-   let cls=(f==="reset"&&d.reset!=="clean")||(f==="send_fail"&&d.send_fail>0)||(f==="_mqtt"&&!d.mqtt_ready)
-    ||(f==="_loss"&&d.mqtt_pkts&&d.mqtt_lost*100>=d.mqtt_pkts)||(f==="_room"&&d.mqtt_max_alloc<d.mqtt_skip_threshold)?" class=bad"
-    :(f==="_room"&&d.mqtt_max_alloc-d.mqtt_skip_threshold<1024)?" class=warn":"";
-   return `<tr><td>${k}</td><td${cls}>${v}</td></tr>`}).join("");
- }catch(e){}
+  const d=await (await fetch("/api/status")).json(),now=Date.now();
+  heap.push(d.heap_free/1024);if(heap.length>MAXH)heap.shift();
+  if(d.mqtt_pkts!==undefined){
+   if(last&&now>last.t&&d.mqtt_pkts>=last.p){pk.push((d.mqtt_pkts-last.p)*60000/(now-last.t));if(pk.length>MAXH)pk.shift();}
+   last={t:now,p:d.mqtt_pkts};
+  }
+  render(d);
+ }catch(e){const p=$('pill');p.textContent="Offline";p.className="pill b";}
 }
-tick();setInterval(tick,3000);
+async function slow(){
+ try{bk=(await (await fetch("/api/mqtt/status")).json()).slots;brokers();}catch(e){}
+}
+(async()=>{
+ try{names=(await (await fetch("/api/mqtt/config")).json()).slots.map(s=>s.preset=="custom"?"Custom broker":s.preset=="none"?"Off":s.preset);}catch(e){}
+ try{const n=await (await fetch("/api/nodes")).json();nodes(n.nodes,n.total);}catch(e){$('nodes').textContent="Could not load.";}
+ await tick();slow();
+ setInterval(()=>{if(document.visibilityState=="visible")tick();},3000);
+ setInterval(()=>{if(document.visibilityState=="visible")slow();},15000);
+})();
 </script>
 )HTML";
 
@@ -288,6 +346,11 @@ void BotWebUI::begin() {
   s_server.on("/", HTTP_GET, [](AsyncWebServerRequest* r) {
     if (!auth_ok(r)) return;
     r->send(200, "text/html", PAGE);
+  });
+  s_server.on("/ui.css", HTTP_GET, [](AsyncWebServerRequest* r) {   // static, no secrets: no auth
+    AsyncWebServerResponse* resp = r->beginResponse_P(200, "text/css", UI_CSS);
+    resp->addHeader("Cache-Control", "max-age=3600");
+    r->send(resp);
   });
   s_server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest* r) {
     if (!auth_ok(r)) return;
