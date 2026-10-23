@@ -235,13 +235,12 @@ static const char PAGE[] = R"HTML(<!doctype html><meta charset=utf-8>
 <div class=cd><h4>Memory <span>internal heap</span></h4><div id=mem></div></div>
 <div class=cd><h4>Traffic <span>since boot</span></h4><div id=trf></div></div>
 <div class=cd><h4>MQTT brokers</h4><div id=brk><span class=mut>Loading...</span></div></div>
-<div class=cd><h4>Node memory <span id=ncount></span></h4><div id=nodes><span class=mut>Loading...</span></div></div>
 <div class="cd sp2"><h4>Details <span>refreshes every 3 s</span></h4><div class=kv id=kv></div></div>
 </div></div>
 <script>
 const $=i=>document.getElementById(i);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const MAXH=300,heap=[],pk=[];let last=null,names=[],bk=[],tp=null;
+const MAXH=300,heap=[],pk=[];let last=null,bk=[];
 function sp(v,w,h,o){o=o||{};
  const mn=o.min!=null?o.min:Math.min(...v),mx=o.max!=null?o.max:Math.max(...v);
  const x=i=>3+i*(w-6)/Math.max(1,v.length-1),y=a=>h-4-(a-mn)/((mx-mn)||1)*(h-8);
@@ -306,13 +305,7 @@ function brokers(){
  $('brk').innerHTML=bk.map((s,i)=>{
   const T={ok:"Connected",wait:"Waiting for settings",fail:"Failed to connect",disc:"Connecting...",off:"Not running",inactive:"Off"};
   const c=s.state=="ok"?"":s.state=="fail"?"b":(s.state=="inactive"||s.state=="off")?"o":"w";
-  return `<div class=bk><span class="d ${c}"></span><span class=nm>${esc(names[i]||"Broker "+(i+1))}</span><span class=sn>${s.ok}</span><span class=sm>${T[s.state]||esc(s.state)} · ${s.err} errors</span></div>`}).join("")||'<span class=mut>None</span>';
-}
-function nodes(list,total){
- const c=[0,0,0,0,0];list.forEach(n=>c[n.type>=1&&n.type<=4?n.type:0]++);
- const col=["var(--line)","var(--acc)","color-mix(in srgb,var(--acc) 55%,var(--card))","var(--amb)","var(--mut)"],lb=["other","companions","repeaters","rooms","sensors"];
- $('ncount').textContent=total+" nodes";
- $('nodes').innerHTML=`<div class=fn>${c.map((n,i)=>`<i style="flex:${n};background:${col[i]}"></i>`).join("")}</div><div class=lg>${[1,2,3,4,0].filter(i=>c[i]).map(i=>`<span><i class=sw8 style="background:${col[i]}"></i>${lb[i]} <b>${c[i]}</b></span>`).join("")}</div><p class=mut style="margin:10px 0 0;font-size:.85rem">See the <a href="/nodes">Nodes page</a> for the full list.</p>`;
+  return `<div class=bk><span class="d ${c}"></span><span class=nm>${esc(s.name||"Broker "+(i+1))}</span><span class=sn>${s.ok}</span><span class=sm>${T[s.state]||esc(s.state)} · ${s.err} errors</span></div>`}).join("")||'<span class=mut>None</span>';
 }
 async function tick(){
  try{
@@ -329,8 +322,6 @@ async function slow(){
  try{bk=(await (await fetch("/api/mqtt/status")).json()).slots;brokers();}catch(e){}
 }
 (async()=>{
- try{names=(await (await fetch("/api/mqtt/config")).json()).slots.map(s=>s.preset=="custom"?"Custom broker":s.preset=="none"?"Off":s.preset);}catch(e){}
- try{const n=await (await fetch("/api/nodes")).json();nodes(n.nodes,n.total);}catch(e){$('nodes').textContent="Could not load.";}
  await tick();slow();
  setInterval(()=>{if(document.visibilityState=="visible")tick();},3000);
  setInterval(()=>{if(document.visibilityState=="visible")slow();},15000);
@@ -398,9 +389,9 @@ void BotWebUI::begin() {
       unsigned long ok, err;
       if (i) replyAppendf(buf, sizeof(buf), &pos, ",");
       if (the_mesh.mqtt().slotStatus(i, &name, &state, &ok, &err))
-        replyAppendf(buf, sizeof(buf), &pos, "{\"state\":\"%s\",\"ok\":%lu,\"err\":%lu}", state, ok, err);
+        replyAppendf(buf, sizeof(buf), &pos, "{\"name\":\"%s\",\"state\":\"%s\",\"ok\":%lu,\"err\":%lu}", name ? name : "", state, ok, err);
       else
-        replyAppendf(buf, sizeof(buf), &pos, "{\"state\":\"off\",\"ok\":0,\"err\":0}");
+        replyAppendf(buf, sizeof(buf), &pos, "{\"name\":\"\",\"state\":\"off\",\"ok\":0,\"err\":0}");
     }
     replyAppendf(buf, sizeof(buf), &pos, "]}");
     r->send(200, "application/json", buf);
