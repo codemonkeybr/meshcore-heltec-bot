@@ -12,7 +12,7 @@
 // own task (never in the mesh RX / loop path), formats a reply, and posts a
 // HttpResult back.
 enum HttpKind : uint8_t {
-  HTTP_WX = 1, HTTP_AQI, HTTP_RAIN, HTTP_SOLAR, HTTP_JOKE, HTTP_DADJOKE,
+  HTTP_WX = 1, HTTP_AQI, HTTP_RAIN, HTTP_SOLAR, HTTP_JOKE, HTTP_DADJOKE, HTTP_WIND,
 };
 
 struct HttpJob {

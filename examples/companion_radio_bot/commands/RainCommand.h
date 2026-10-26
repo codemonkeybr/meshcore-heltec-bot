@@ -4,11 +4,17 @@
 #include "../BotMesh.h"
 #include "../HttpWorker.h"
 
-// Minute-level "rain starting/easing in ~N min" (Open-Meteo 15-minutely).
+// Minute-level rain/snow nowcast with amount (Open-Meteo 15-minutely). `snow` and
+// `precip` are aliases: the reply says what is actually falling either way.
 class RainCommand : public Command {
 public:
   const char* keyword() const override { return "rain"; }
-  const char* help() const override { return "rain - short-term rain nowcast for my location"; }
+  const char* help() const override { return "rain - rain/snow nowcast for my location (also: snow, precip)"; }
+
+  bool matches(const BotMsg& msg) const override {
+    return matchesKeyword(msg, "rain") || matchesKeyword(msg, "snow") ||
+           matchesKeyword(msg, "precip");
+  }
 
   void run(BotMesh& mesh, const BotMsg& msg) override {
     double lat, lon;

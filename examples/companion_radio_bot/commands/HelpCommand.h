@@ -19,7 +19,9 @@ public:
     const CommandRouter& r = mesh.router();
     if (topic[0]) {
       for (int i = 0; i < r.count(); i++) {
-        if (strcasecmp(r.at(i)->keyword(), topic) == 0) {
+        BotMsg q;                       // let aliases (help snow) find their command
+        q.text = topic;
+        if (r.at(i)->matches(q)) {
           const char* h = r.at(i)->help();
           char out[BOT_MAX_REPLY_LEN + 1];
           if (h && *h) snprintf(out, sizeof(out), "Usage: %s", h);   // keyword-first would re-trigger bots

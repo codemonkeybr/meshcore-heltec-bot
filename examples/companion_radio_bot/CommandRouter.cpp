@@ -18,6 +18,7 @@
 #include "commands/WxCommand.h"
 #include "commands/AqiCommand.h"
 #include "commands/RainCommand.h"
+#include "commands/WindCommand.h"
 #include "commands/SolarCommand.h"
 #include "commands/JokeCommand.h"
 #include "commands/DadjokeCommand.h"
@@ -38,6 +39,7 @@ static MoonCommand        s_moon;
 static WxCommand          s_wx;
 static AqiCommand         s_aqi;
 static RainCommand        s_rain;
+static WindCommand        s_wind;
 static SolarCommand       s_solar;
 static JokeCommand        s_joke;
 static DadjokeCommand     s_dadjoke;
@@ -52,7 +54,7 @@ static Command* const kCommands[] = {
   &s_ping, &s_version, &s_test,
   &s_path, &s_prefix, &s_leaderboard, &s_stats,
   &s_sun, &s_moon,
-  &s_wx, &s_aqi, &s_rain, &s_solar, &s_joke, &s_dadjoke,
+  &s_wx, &s_aqi, &s_rain, &s_wind, &s_solar, &s_joke, &s_dadjoke,
   &s_hello, &s_dice, &s_roll, &s_magic8,
   &s_cmd, &s_help,
 };

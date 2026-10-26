@@ -227,30 +227,107 @@ static void do_aqi(const HttpJob& j, char* out, size_t n) {
   snprintf(out, n, "Air quality %d AQI (%s), PM2.5 %.1f, PM10 %.1f", aqi, cat, pm25, pm10);
 }
 
+// Precipitation type of one 15-min slot. Thresholds are per slot (mm rain / cm snow).
+enum { P_DRY = 0, P_RAIN, P_SNOW, P_MIX };
+static int precip_type(double rain_slot, double snow_slot) {
+  bool r = rain_slot > 0.05, s = snow_slot > 0.05;
+  return (r && s) ? P_MIX : s ? P_SNOW : r ? P_RAIN : P_DRY;
+}
+static const char* const kPrecipName[]  = { "", "Rain", "Snow", "Rain/snow mix" };
+static const char* const kPrecipLower[] = { "", "rain", "snow", "rain/snow mix" };
+
+// Rates are per hour (slot value * 4). Rain bands are the usual mm/h ones; snow
+// bands are the same idea in cm/h.
+static void fmt_amount(char* out, size_t n, int type, double rain_mmh, double snow_cmh) {
+  if (type == P_RAIN) {
+    snprintf(out, n, "%s (%.1f mm/h)",
+             rain_mmh < 2.5 ? "light" : rain_mmh < 7.6 ? "moderate" : "heavy", rain_mmh);
+  } else if (type == P_SNOW) {
+    snprintf(out, n, "%s (%.1f cm/h)",
+             snow_cmh < 1.0 ? "light" : snow_cmh < 2.5 ? "moderate" : "heavy", snow_cmh);
+  } else {
+    snprintf(out, n, "%.1f mm/h rain, %.1f cm/h snow", rain_mmh, snow_cmh);
+  }
+}
+
 static void do_rain(const HttpJob& j, char* out, size_t n) {
-  char url[220];
+  char url[240];
   snprintf(url, sizeof(url),
     "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
-    "&minutely_15=precipitation&forecast_minutely_15=8", j.lat, j.lon);
+    "&minutely_15=rain,showers,snowfall&forecast_minutely_15=8", j.lat, j.lon);
   JsonDocument doc(&s_json_alloc);
   int code = fetch_json(url, doc, false, nullptr);
   if (code != 200) { snprintf(out, n, "Nowcast unavailable (%d)", code); return; }
 
-  JsonArray p = doc["minutely_15"]["precipitation"];
-  if (p.isNull() || p.size() == 0) { snprintf(out, n, "no nowcast data"); return; }
+  JsonArray ra = doc["minutely_15"]["rain"];
+  JsonArray sh = doc["minutely_15"]["showers"];
+  JsonArray sn = doc["minutely_15"]["snowfall"];
+  size_t cnt = ra.size();
+  if (sh.size() < cnt) cnt = sh.size();
+  if (sn.size() < cnt) cnt = sn.size();
+  if (cnt == 0) { snprintf(out, n, "no nowcast data"); return; }
+  if (cnt > 16) cnt = 16;
 
-  bool now_wet = p[0].as<double>() > 0.05;
-  int change_idx = -1;
-  for (size_t i = 1; i < p.size(); i++) {
-    bool wet = p[i].as<double>() > 0.05;
-    if (wet != now_wet) { change_idx = (int)i; break; }
+  int type[16];
+  double rate_r[16], rate_s[16];            // per hour
+  for (size_t i = 0; i < cnt; i++) {
+    double r = ra[i].as<double>() + sh[i].as<double>();
+    double s = sn[i].as<double>();
+    type[i] = precip_type(r, s);
+    rate_r[i] = r * 4.0;
+    rate_s[i] = s * 4.0;
   }
-  if (change_idx < 0) {
-    snprintf(out, n, now_wet ? "raining, no letup in the next 2h" : "dry, no rain in the next 2h");
-  } else {
-    int mins = change_idx * 15;
-    snprintf(out, n, now_wet ? "Rain: easing in ~%d min" : "Rain: starting in ~%d min", mins);
+
+  int change = -1;                          // first slot whose type differs from now
+  for (size_t i = 1; i < cnt; i++) {
+    if (type[i] != type[0]) { change = (int)i; break; }
   }
+
+  char amt[64];
+  if (type[0] == P_DRY) {
+    if (change < 0) { snprintf(out, n, "dry, no precipitation in the next 2h"); return; }
+    fmt_amount(amt, sizeof(amt), type[change], rate_r[change], rate_s[change]);
+    snprintf(out, n, "%s: starting in ~%d min, %s", kPrecipName[type[change]], change * 15, amt);
+  } else if (change < 0) {
+    double pr = 0, ps = 0;
+    for (size_t i = 0; i < cnt; i++) {
+      if (rate_r[i] > pr) pr = rate_r[i];
+      if (rate_s[i] > ps) ps = rate_s[i];
+    }
+    fmt_amount(amt, sizeof(amt), type[0], pr, ps);
+    snprintf(out, n, "%s, no letup in the next 2h, peak %s", kPrecipName[type[0]], amt);
+  } else if (type[change] == P_DRY) {
+    fmt_amount(amt, sizeof(amt), type[0], rate_r[0], rate_s[0]);
+    snprintf(out, n, "%s: easing in ~%d min, now %s", kPrecipName[type[0]], change * 15, amt);
+  } else {                                  // wet -> different wet type, no dry gap
+    fmt_amount(amt, sizeof(amt), type[change], rate_r[change], rate_s[change]);
+    snprintf(out, n, "Turning to %s in ~%d min (%s now), %s",
+             kPrecipLower[type[change]], change * 15, kPrecipLower[type[0]], amt);
+  }
+}
+
+// Reply must not start with the word "wind" (or any keyword): another bot would
+// read it as a command and answer it.
+static void do_wind(const HttpJob& j, char* out, size_t n) {
+  char url[240];
+  snprintf(url, sizeof(url),
+    "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
+    "&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=%s",
+    j.lat, j.lon, BotSettings::live().wx_metric ? "kmh" : "mph");
+  JsonDocument doc(&s_json_alloc);
+  int code = fetch_json(url, doc, false, nullptr);
+  if (code != 200) { snprintf(out, n, "Conditions unavailable (%d)", code); return; }
+
+  JsonObject c = doc["current"];
+  if (c.isNull()) { snprintf(out, n, "no wind data"); return; }
+  double ws = c["wind_speed_10m"] | 0.0;
+  double wd = c["wind_direction_10m"] | 0.0;
+  double gust = c["wind_gusts_10m"] | 0.0;
+  const char* u = BotSettings::live().wx_metric ? "km/h" : "mph";
+
+  if (ws < 1.0) { snprintf(out, n, "Calm, under 1 %s", u); return; }
+  size_t k = snprintf(out, n, "From the %s (%.0f\xC2\xB0) at %.0f %s", compass(wd), wd, ws, u);
+  if (gust > ws + 1.0 && k < n) snprintf(out + k, n - k, ", gusts to %.0f %s", gust, u);
 }
 
 static bool fetch_noaa_val(const char* url, const char* const* keys, char* val, size_t vn) {
@@ -324,6 +401,7 @@ void HttpWorker::taskLoop() {
         case HTTP_WX:      do_wx(job, res.text, sizeof(res.text)); break;
         case HTTP_AQI:     do_aqi(job, res.text, sizeof(res.text)); break;
         case HTTP_RAIN:    do_rain(job, res.text, sizeof(res.text)); break;
+        case HTTP_WIND:    do_wind(job, res.text, sizeof(res.text)); break;
         case HTTP_SOLAR:   do_solar(job, res.text, sizeof(res.text)); break;
         case HTTP_JOKE:    do_joke(job, res.text, sizeof(res.text)); break;
         case HTTP_DADJOKE: do_dadjoke(job, res.text, sizeof(res.text)); break;
