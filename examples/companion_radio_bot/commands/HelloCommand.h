@@ -17,7 +17,7 @@ public:
   void run(BotMesh& mesh, const BotMsg& msg) override {
     static const char* greetings[] = {
       "beep boop. hello %s",
-      "hi %s, %s online",
+      "Hello %s, %s online",
       "greetings %s",
       "%s: systems nominal, hello",
     };

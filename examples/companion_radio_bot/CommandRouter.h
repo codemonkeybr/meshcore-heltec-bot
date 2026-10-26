@@ -21,6 +21,10 @@ public:
   // settings page lists these; count()/at() only cover the enabled ones).
   static int totalCommands();
   static const char* commandKeyword(int i);
+
+  // True if `text`, received as a message, would trigger any compiled-in command
+  // (aliases included, settings ignored: another bot may have different ones on).
+  static bool wouldTrigger(const char* text);
   Command* at(int i) const { return (i >= 0 && i < _count) ? _cmds[i] : nullptr; }
 
 private:

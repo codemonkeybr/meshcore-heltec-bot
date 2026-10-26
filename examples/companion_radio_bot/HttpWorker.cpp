@@ -215,7 +215,7 @@ static void do_aqi(const HttpJob& j, char* out, size_t n) {
     "&current=us_aqi,pm2_5,pm10,ozone", j.lat, j.lon);
   JsonDocument doc(&s_json_alloc);
   int code = fetch_json(url, doc, false, nullptr);
-  if (code != 200) { snprintf(out, n, "AQI unavailable (%d)", code); return; }
+  if (code != 200) { snprintf(out, n, "Air quality unavailable (%d)", code); return; }
 
   JsonObject c = doc["current"];
   int aqi = c["us_aqi"] | -1;
@@ -224,7 +224,7 @@ static void do_aqi(const HttpJob& j, char* out, size_t n) {
   const char* cat = aqi < 0 ? "?" : aqi <= 50 ? "good" : aqi <= 100 ? "moderate" :
                     aqi <= 150 ? "unhealthy (sensitive)" : aqi <= 200 ? "unhealthy" :
                     aqi <= 300 ? "very unhealthy" : "hazardous";
-  snprintf(out, n, "AQI %d (%s), PM2.5 %.1f, PM10 %.1f", aqi, cat, pm25, pm10);
+  snprintf(out, n, "Air quality %d AQI (%s), PM2.5 %.1f, PM10 %.1f", aqi, cat, pm25, pm10);
 }
 
 static void do_rain(const HttpJob& j, char* out, size_t n) {
@@ -234,7 +234,7 @@ static void do_rain(const HttpJob& j, char* out, size_t n) {
     "&minutely_15=precipitation&forecast_minutely_15=8", j.lat, j.lon);
   JsonDocument doc(&s_json_alloc);
   int code = fetch_json(url, doc, false, nullptr);
-  if (code != 200) { snprintf(out, n, "rain nowcast unavailable (%d)", code); return; }
+  if (code != 200) { snprintf(out, n, "Nowcast unavailable (%d)", code); return; }
 
   JsonArray p = doc["minutely_15"]["precipitation"];
   if (p.isNull() || p.size() == 0) { snprintf(out, n, "no nowcast data"); return; }
@@ -249,7 +249,7 @@ static void do_rain(const HttpJob& j, char* out, size_t n) {
     snprintf(out, n, now_wet ? "raining, no letup in the next 2h" : "dry, no rain in the next 2h");
   } else {
     int mins = change_idx * 15;
-    snprintf(out, n, now_wet ? "rain easing in ~%d min" : "rain starting in ~%d min", mins);
+    snprintf(out, n, now_wet ? "Rain: easing in ~%d min" : "Rain: starting in ~%d min", mins);
   }
 }
 

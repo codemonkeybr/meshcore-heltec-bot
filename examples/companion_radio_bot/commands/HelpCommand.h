@@ -21,7 +21,10 @@ public:
       for (int i = 0; i < r.count(); i++) {
         if (strcasecmp(r.at(i)->keyword(), topic) == 0) {
           const char* h = r.at(i)->help();
-          mesh.botReply(msg, (h && *h) ? h : "no help for that command");
+          char out[BOT_MAX_REPLY_LEN + 1];
+          if (h && *h) snprintf(out, sizeof(out), "Usage: %s", h);   // keyword-first would re-trigger bots
+          else         snprintf(out, sizeof(out), "no help for that command");
+          mesh.botReply(msg, out);
           return;
         }
       }

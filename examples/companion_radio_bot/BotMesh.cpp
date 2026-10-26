@@ -476,8 +476,10 @@ void BotMesh::enqueueReply(const ReplyTarget& t, const char* text) {
   for (auto& e : s_outq) {
     if (e.used) continue;
     e.target = t;
-    strncpy(e.text, text, BOT_MAX_REPLY_LEN);
-    e.text[BOT_MAX_REPLY_LEN] = '\0';
+    // A reply whose first word is a command keyword would make another bot
+    // answer it, and then us answering that: a loop. Mark it so it can't match.
+    if (CommandRouter::wouldTrigger(text)) snprintf(e.text, BOT_MAX_REPLY_LEN + 1, "\xC2\xBB %s", text);
+    else                                   snprintf(e.text, BOT_MAX_REPLY_LEN + 1, "%s", text);
     e.used = true;
     return;
   }

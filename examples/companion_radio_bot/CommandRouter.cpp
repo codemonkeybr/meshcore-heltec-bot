@@ -74,6 +74,15 @@ Command* CommandRouter::match(const BotMsg& msg) const {
   return nullptr;
 }
 
+bool CommandRouter::wouldTrigger(const char* text) {
+  BotMsg m;
+  m.text = text;
+  for (Command* c : kCommands) {
+    if (c->matches(m)) return true;
+  }
+  return false;
+}
+
 int CommandRouter::totalCommands() { return (int)(sizeof(kCommands) / sizeof(kCommands[0])); }
 const char* CommandRouter::commandKeyword(int i) {
   return (i >= 0 && i < totalCommands()) ? kCommands[i]->keyword() : "";
