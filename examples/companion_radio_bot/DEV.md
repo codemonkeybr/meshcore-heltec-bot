@@ -42,12 +42,12 @@ its last frame ("Loading..."). So:
 
 ```
 BIN=.pio/build/heltec_v4_companion_radio_bot/firmware.bin
-curl -sS -H "Expect:" -m 180 -u admin:changeme \
+curl -sS -H "Expect:" -m 180 -u admin:<password> \
   -F "MD5=$(md5sum $BIN | cut -d' ' -f1)" -F "firmware=@$BIN" \
-  http://192.168.1.185/update
+  http://<board-address>/update
 # curl exits 56 ("connection reset") on success - ElegantOTA restart()s
 # before sending the final "OK". Verify via /api/status:
-curl -s -u admin:changeme http://192.168.1.185/api/status   # check "version" + fresh "uptime_s"
+curl -s -u admin:<password> http://<board-address>/api/status   # check "version" + fresh "uptime_s"
 ```
 
 No clean-build needed for a .cpp-only change; still `pio run -t clean` after header edits.

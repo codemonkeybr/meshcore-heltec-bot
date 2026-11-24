@@ -4,6 +4,8 @@
 #   firmware.bin         app image for OTA updates (web UI /update)
 #   manifest.json + index.html   browser installer (serve over HTTPS)
 #   SHA256SUMS
+# Env: PIO (pio binary), OUT_DIR (override output folder), REPO (owner/name shown
+# on the page, default codemonkeybr/meshcore-heltec-bot).
 # Builds with platformio.local.ini hidden so no WiFi password, location or other
 # local settings can end up in the binary.
 set -euo pipefail
@@ -12,7 +14,14 @@ cd "$(dirname "$0")/../.."
 ENV=heltec_v4_companion_radio_bot
 VER=$(sed -n 's/^#define BOT_VERSION "\(.*\)"/\1/p' examples/companion_radio_bot/BotConfig.h)
 [ -n "$VER" ] || { echo "cannot read BOT_VERSION"; exit 1; }
-OUT=out/release/$VER
+OUT=${OUT_DIR:-out/release/$VER}
+REPO=${REPO:-codemonkeybr/meshcore-heltec-bot}
+
+# A release tag must match the firmware version.
+TAG=$(git describe --tags --exact-match 2>/dev/null || true)
+if [ -n "$TAG" ] && [ "$TAG" != "v$VER" ]; then
+  echo "tag $TAG does not match BOT_VERSION $VER" >&2; exit 1
+fi
 LOCAL=platformio.local.ini
 HOLD=$LOCAL.release-hold
 
@@ -32,10 +41,10 @@ B=.pio/build/$ENV
 mkdir -p "$OUT"
 cp $B/firmware-merged.bin "$OUT/firmware-merged.bin"
 cp $B/firmware.bin "$OUT/firmware.bin"
-cp examples/companion_radio_bot/flasher/index.html "$OUT/index.html"
+sed -e "s#@VERSION@#$VER#g" -e "s#@REPO@#$REPO#g" examples/companion_radio_bot/flasher/index.html > "$OUT/index.html"
 cat > "$OUT/manifest.json" <<JSON
 {
-  "name": "MeshBot",
+  "name": "HelBot",
   "version": "$VER",
   "new_install_prompt_erase": false,
   "builds": [
