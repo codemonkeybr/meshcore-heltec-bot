@@ -17,7 +17,6 @@
   .mut { color:var(--mut); }
   .ver { display:inline-block; margin-left:8px; padding:1px 9px; font-size:.85rem; border:1px solid var(--line); border-radius:99px; color:var(--mut); vertical-align:middle; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin:14px 0; }
-  .warn { border-left:4px solid var(--warn); }
   ol, ul { padding-left:1.3em; margin:8px 0; } li { margin:7px 0; }
   code, pre { font:.9em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
   code { background:var(--bg); border:1px solid var(--line); border-radius:4px; padding:0 4px; overflow-wrap:anywhere; }
@@ -51,11 +50,6 @@
     <li>If the port isn't listed, or flashing won't start: hold <b>BOOT</b>, tap <b>RST</b>, release <b>BOOT</b>, then try again.</li>
     <li>Wait for it to finish (about a minute). The board restarts by itself.</li>
   </ol>
-  <div class="card warn">
-    <b>Keeping the old firmware?</b> Back it up before installing:
-    <pre><code>esptool.py --chip esp32s3 --port &lt;port&gt; read_flash 0 0x1000000 backup.bin</code></pre>
-    Re-installing a newer version over a bot keeps its name, identity and settings.
-  </div>
 
   <h2>2. Connect it to your WiFi</h2>
   <ol>
