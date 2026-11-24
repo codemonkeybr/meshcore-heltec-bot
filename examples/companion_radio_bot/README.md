@@ -56,7 +56,7 @@ fallback and updates over WiFi: [FLASHING.md](FLASHING.md).
 ## First setup
 
 1. Power the board from a charger or power bank. With no WiFi saved it opens a network called
-   `MeshBot-XXXXXX`; the password is on the board's screen. Join it and the setup page opens.
+   `HelBot-XXXXXX`; the password is on the board's screen. Join it and the setup page opens.
 2. Pick your WiFi network. The board reboots, joins it, and shows its address on the screen.
 3. Open that address in a browser (user `admin`, and the web password you chose during setup).
    The **Settings** page has the bot's name, location, UTC offset, channel allow-list,

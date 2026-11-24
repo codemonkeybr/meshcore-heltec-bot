@@ -106,7 +106,7 @@ void BotWifi::forget() {
 
 static const char PAGE[] PROGMEM = R"HTML(<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MeshBot setup</title>
+<title>HelBot setup</title>
 <style>
 :root{--bg:#f6f7f9;--card:#fff;--fg:#14181f;--mut:#667085;--line:#d9dde3;--acc:#1f6feb;--err:#c0392b}
 @media (prefers-color-scheme:dark){:root{--bg:#0f1218;--card:#181c24;--fg:#e8ebf0;--mut:#98a2b3;--line:#2a303b;--acc:#58a6ff;--err:#ff7b72}}
@@ -124,7 +124,7 @@ button{width:100%;margin-top:16px;padding:13px;border:0;border-radius:8px;backgr
 button.link{width:auto;margin:0;padding:4px 8px;background:none;color:var(--acc);font-weight:500}
 #err{color:var(--err);min-height:1.4em;margin:10px 0 0}
 </style></head><body><main>
-<h1>MeshBot WiFi setup</h1>
+<h1>HelBot WiFi setup</h1>
 <p class="sub">Choose your home WiFi so this device can get online.</p>
 <div id="form">
 <div class="card"><div class="row"><b>Nearby networks</b><button class="link" id="rs">Rescan</button></div>
@@ -170,7 +170,7 @@ async function poll(){
     if(d.state=='ok'){show(true,'Connected! The device is restarting and joining your WiFi. Reconnect your phone to your home WiFi; the device\'s address is shown on its screen.');return;}
     if(d.state=='fail'){show(false);$('err').textContent=d.msg+'. Check the details and try again.';return;}
   }catch(e){
-    if(++fails>=4)$('st').textContent='Lost contact with the device. If it connected, your phone will rejoin your home WiFi and the device\'s screen shows its address. If you are still on MeshBot, refresh this page.';
+    if(++fails>=4)$('st').textContent='Lost contact with the device. If it connected, your phone will rejoin your home WiFi and the device\'s screen shows its address. If you are still on HelBot, refresh this page.';
   }
   setTimeout(poll,2000);
 }
@@ -273,7 +273,7 @@ static void start_setup() {
   if (s_setup) return;
   uint8_t mac[6];
   esp_read_mac(mac, ESP_MAC_WIFI_STA);
-  snprintf(s_ap_name, sizeof(s_ap_name), "MeshBot-%02X%02X%02X", mac[3], mac[4], mac[5]);
+  snprintf(s_ap_name, sizeof(s_ap_name), "HelBot-%02X%02X%02X", mac[3], mac[4], mac[5]);
   snprintf(s_ap_pin, sizeof(s_ap_pin), "%08lu", (unsigned long)(10000000UL + esp_random() % 90000000UL));
 
   WiFi.mode(WIFI_AP_STA);

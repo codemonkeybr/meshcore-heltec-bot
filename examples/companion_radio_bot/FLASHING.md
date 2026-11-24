@@ -41,7 +41,7 @@ completely clean start with a new identity. Back up first if the board holds a f
 ## After a new install
 
 Power the board from a charger or power bank (some PCs hold it in the bootloader). On the first boot it opens the
-`MeshBot-XXXXXX` setup network; see the README's *First setup*.
+`HelBot-XXXXXX` setup network; see the README's *First setup*.
 
 ## Updating over WiFi
 

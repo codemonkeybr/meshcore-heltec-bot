@@ -7,7 +7,7 @@
 // The advert name is set via -D ADVERT_NAME (consumed by MyMesh::begin).
 
 #ifndef BOT_VERSION
-#define BOT_VERSION "0.5.0"
+#define BOT_VERSION "0.5.1"
 #endif
 
 // Local time offset from UTC, in minutes, for almanac output (sun/moon).

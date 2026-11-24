@@ -5,7 +5,7 @@
 //
 // Credential precedence: NVS (saved by the setup page) wins, then the
 // compile-time WIFI_SSID / WIFI_PWD flags (dev builds), else the device starts
-// the setup AP "MeshBot-XXXXXX" (WPA2, 8-digit PIN shown on the OLED).
+// the setup AP "HelBot-XXXXXX" (WPA2, 8-digit PIN shown on the OLED).
 // Leaving setup always reboots, so the AP/DNS/server never need teardown.
 namespace BotWifi {
   // Call from setup() in place of WiFi.begin(): joins the saved network, or
@@ -23,7 +23,7 @@ namespace BotWifi {
   const char* webPass();
 
   bool setupActive();          // setup AP is up
-  const char* apName();        // "MeshBot-XXXXXX"
+  const char* apName();        // "HelBot-XXXXXX"
   const char* apPin();         // 8-digit AP password, fresh per setup session
   // Short status for the OLED: "", "Connecting...", "Connected", "Wrong password"...
   const char* setupStatus();
