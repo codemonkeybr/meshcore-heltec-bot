@@ -42,6 +42,22 @@ void BotObserverMqtt::begin(const char* node_name, float freq, uint8_t sf, uint8
   s_node_prefs.bw = bw;
   s_node_prefs.disable_fwd = disable_fwd ? 1 : 0;
 
+  // Off until the user has configured it: needs a location code (IATA) and at
+  // least one broker. Without either the bridge would hold TLS sessions open
+  // (or refuse every publish) for nothing, so it is not started at all; the
+  // settings page applies changes on reboot.
+  bool any_slot = false;
+  for (int i = 0; i < MQTT_PREFS_SLOT_COUNT; i++) {
+    const char* pr = s_mqtt_prefs.mqtt_slot_preset[i];
+    if (pr[0] == '\0' || !strcmp(pr, "none")) continue;
+    if (!strcmp(pr, "custom") && s_mqtt_prefs.mqtt_slot_host[i][0] == '\0') continue;
+    any_slot = true;
+  }
+  if (!any_slot || s_mqtt_prefs.mqtt_iata[0] == '\0') {
+    BOT_DEBUG_PRINTLN("MQTT observer off (%s)", any_slot ? "no IATA set" : "no broker set");
+    return;
+  }
+
   s_bridge = new MQTTBridge(&s_node_prefs, &s_mqtt_prefs, mgr, rtc, identity);
 
   char device_id[65];

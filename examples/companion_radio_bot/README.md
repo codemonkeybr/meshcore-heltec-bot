@@ -33,7 +33,7 @@ RateLimiter.{h,cpp}   Token buckets: global / per-channel / per-sender. A reply
                       senders (DMs key on pubkey prefix).
 BotConfig.h           All compile-time knobs (rates, allow-list, prefix, version).
 BotMsg.h              Normalised inbound message (carries routing path).
-BotDebug.h            `BOT_DEBUG_PRINTLN`, gated on -D BOT_DEBUG=1.
+BotDebug.h            `BOT_DEBUG_PRINTLN`, gated on -D BOT_DEBUG=1 (dev env only).
 commands/
   Command.{h,cpp}     Base class: matchesKeyword() + args() parsing.
   PingCommand.h       ping -> pong
@@ -47,33 +47,44 @@ commands/
   HelpCommand.h       help [cmd]
 ```
 
-## Identity
+## Install
 
-The build sets `-D ADVERT_NAME='"D4rl3k"'`. On a device with an existing
-identity file the name change applies but the **keypair is kept**. For a clean
-throwaway identity, `esptool erase-flash` before the first upload — first boot
-then generates a new keypair and adopts the name.
+Heltec WiFi LoRa 32 **V4** only. Use the browser installer from the release page (Chrome, Edge or
+Opera), or flash `firmware-merged.bin` at `0x0` with esptool. Step by step, including the BOOT-button
+fallback and updates over WiFi: [FLASHING.md](FLASHING.md).
 
-## Build
+## First setup
+
+1. Power the board from a charger or power bank. With no WiFi saved it opens a network called
+   `MeshBot-XXXXXX`; the password is on the board's screen. Join it and the setup page opens.
+2. Pick your WiFi network. The board reboots, joins it, and shows its address on the screen.
+3. Open that address in a browser (user `admin`, and the web password you chose during setup).
+   The **Settings** page has the bot's name, location, UTC offset, channel allow-list,
+   per-command on/off, wx units and rate limits.
+4. Set the LoRa region and the channel the bot answers on from the MeshCore app, as for any
+   companion radio.
+
+Holding BOOT for 10 s wipes the saved WiFi (keeps the web password).
+
+## MQTT observer uplink (off by default)
+
+The bot can also publish the packets it hears to a MeshCore analyzer over MQTT. It does nothing until you
+set **both** a broker (a preset or a custom one) and your **IATA location code** on the Settings page,
+then reboot. The community brokers are shared, volunteer-run infrastructure: use your own region's
+code and the operator's rules.
+
+## Credits and licence
+
+MIT. Built on MeshCore and other people's work, listed with their licences in
+[THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md).
+
+## Building from source
 
 ```
-# set WIFI_SSID / WIFI_PWD in variants/heltec_v4/platformio.ini or platformio.local.ini
-pio run -e heltec_v4_companion_radio_bot
-pio run -e heltec_v4_companion_radio_bot -t upload
-pio device monitor -b 115200      # "Bot: ..." debug lines
+pio run -e heltec_v4_companion_radio_bot               # release flags
+pio run -e heltec_v4_companion_radio_bot_dev           # + diagnostics and serial debug prints
+./examples/companion_radio_bot/release.sh              # clean, secret-free release into out/release/<version>/
 ```
 
-## Status
-
-Phase 1 + 2:
-- Command router, multi-class rate limiter, channel allow-list, loop guard.
-- `BotStore`: persistent node/location cache (`onDiscoveredContact` -> RAM array,
-  flushed to `/botcache.bin` on SPIFFS) that outlives the 350-contact companion
-  table + eviction. Leaderboard records in NVS.
-- `PathDistance`: hop-hash -> cached node, recency+geo disambiguation, haversine
-  sum sender -> hops -> self.
-- Commands: ping version test/t **path/p/decode/route** **prefix** **leaderboard/lb**
-  **stats/status** hello dice roll magic8 cmd help.
-
-Not yet: deferred/chunked TX queue, trace/tracer/multitest/neighbors, almanac,
-internet commands, web config, serial-observability fix. See the project plan.
+`platformio.local.ini` (gitignored) holds dev-only overrides such as a compile-time WiFi fallback; the
+release script builds with it hidden. See [DEV.md](DEV.md) for flashing and OTA notes.

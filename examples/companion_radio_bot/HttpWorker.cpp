@@ -121,6 +121,8 @@ static const char* compass(double deg) {
   return d[i];
 }
 
+extern const uint8_t x509_crt_bundle[] asm("_binary_x509_crt_bundle_start");
+
 // GET url into a JsonDocument. Returns HTTP status (or a negative error).
 // If `filter` is non-null, only keys present in *filter are kept.
 static int fetch_json(const char* url, JsonDocument& doc, bool accept_json = true,
@@ -131,6 +133,11 @@ static int fetch_json(const char* url, JsonDocument& doc, bool accept_json = tru
   WiFiClientSecure client;
 #if BOT_HTTP_INSECURE
   client.setInsecure();
+#else
+  // ESP-IDF's built-in Mozilla root bundle, already linked in for the MQTT
+  // bridge (CONFIG_MBEDTLS_CERTIFICATE_BUNDLE); same blob format the Arduino
+  // core expects. Verification needs a correct clock, which NTP provides.
+  client.setCACertBundle(x509_crt_bundle);
 #endif
 
   HTTPClient http;
@@ -139,7 +146,7 @@ static int fetch_json(const char* url, JsonDocument& doc, bool accept_json = tru
   http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
   http.setReuse(false);
   if (!http.begin(client, url)) return -1;
-  http.addHeader("User-Agent", "meshcore-heltec-bot/0.4 (+github.com/codemonkeybr)");
+  http.addHeader("User-Agent", "meshcore-heltec-bot/" BOT_VERSION " (+github.com/codemonkeybr)");
   if (accept_json) http.addHeader("Accept", "application/json");
 
   int code = http.GET();

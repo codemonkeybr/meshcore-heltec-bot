@@ -7,7 +7,7 @@
 // The advert name is set via -D ADVERT_NAME (consumed by MyMesh::begin).
 
 #ifndef BOT_VERSION
-#define BOT_VERSION "0.4.0"
+#define BOT_VERSION "0.5.0"
 #endif
 
 // Local time offset from UTC, in minutes, for almanac output (sun/moon).
@@ -115,7 +115,7 @@
 
 // --- internet commands (HttpWorker) ----------------------------------
 #ifndef BOT_HTTP_INSECURE
-#define BOT_HTTP_INSECURE 1        // skip TLS cert validation (public read-only APIs)
+#define BOT_HTTP_INSECURE 0        // 1 = skip TLS cert validation (dev only); 0 = verify against the IDF root bundle
 #endif
 #ifndef BOT_HTTP_TIMEOUT_MS
 #define BOT_HTTP_TIMEOUT_MS 9000

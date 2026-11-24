@@ -1,0 +1,8 @@
+{
+  "name": "TimezoneStub",
+  "version": "1.0.0",
+  "description": "Minimal MIT stand-in for the Timezone types used by the vendored MQTT bridge. Replaces JChristensen/Timezone (GPL-3.0), whose conversion functions are never called.",
+  "license": "MIT",
+  "frameworks": "arduino",
+  "platforms": "espressif32"
+}

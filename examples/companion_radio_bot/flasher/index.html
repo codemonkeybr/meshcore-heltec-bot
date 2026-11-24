@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MeshBot installer</title>
+<style>
+  :root { color-scheme: light dark; --bg:#fff; --fg:#1b1f24; --mut:#5b6672; --card:#f4f6f8; --line:#d8dee4; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1317; --fg:#e6eaee; --mut:#9aa5b1; --card:#171d23; --line:#2a323a; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,sans-serif; }
+  main { max-width:640px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { margin:0 0 4px; font-size:1.6rem; }
+  .mut { color:var(--mut); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin:16px 0; }
+  ol { padding-left:1.2em; } li { margin:6px 0; }
+  code { background:var(--card); border:1px solid var(--line); border-radius:4px; padding:0 4px; }
+  esp-web-install-button button { font:inherit; padding:12px 20px; border-radius:10px; border:0; background:#1f6feb; color:#fff; cursor:pointer; }
+  .warn { border-left:4px solid #d29922; }
+</style>
+</head>
+<body>
+<main>
+  <h1>MeshBot installer</h1>
+  <p class="mut">On-device MeshCore command bot for the <b>Heltec WiFi LoRa 32 V4</b>. Installs from this page over USB; no tools needed.</p>
+
+  <div class="card">
+    <esp-web-install-button manifest="manifest.json">
+      <span slot="unsupported">This browser can't flash over USB. Use Chrome, Edge or Opera on a computer.</span>
+      <span slot="not-allowed">Flashing needs HTTPS (or localhost).</span>
+    </esp-web-install-button>
+  </div>
+
+  <div class="card">
+    <b>Steps</b>
+    <ol>
+      <li>Plug the board in with a USB data cable and press <b>Install</b>.</li>
+      <li>Pick the board's serial port. If it isn't listed, hold <b>BOOT</b>, tap <b>RST</b>, release <b>BOOT</b>, and try again.</li>
+      <li>After install, power the board from a charger or power bank. On first boot it opens a WiFi network called <code>MeshBot-XXXXXX</code> (the password is on its screen); join it and the setup page opens by itself.</li>
+      <li>Open the board's address in a browser to change settings (name, location, channels, MQTT).</li>
+    </ol>
+  </div>
+
+  <div class="card warn">
+    <b>Heltec V4 only.</b> Installing replaces the firmware on the board. Back it up first if it holds something you want to keep
+    (<code>esptool read_flash 0 0x1000000 backup.bin</code>). Your radio region and channel settings are set afterwards from the MeshCore app.
+  </div>
+
+  <p class="mut">Open source, MIT with third-party notices. Source and notices are in the project repository.</p>
+</main>
+<script type="module" src="https://unpkg.com/esp-web-tools@10.0.1/dist/web/install-button.js?module"></script>
+</body>
+</html>
