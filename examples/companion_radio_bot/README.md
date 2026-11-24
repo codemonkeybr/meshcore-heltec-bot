@@ -49,8 +49,8 @@ commands/
 
 ## Install
 
-Heltec WiFi LoRa 32 **V4** only. Use the browser installer from the release page (Chrome, Edge or
-Opera), or flash `firmware-merged.bin` at `0x0` with esptool. Step by step, including the BOOT-button
+Heltec WiFi LoRa 32 **V4** only. Use the browser installer (Chrome, Edge or Opera), which handles new installs and
+updates and picks the right file for a chosen version, or use esptool. Step by step, including the BOOT-button
 fallback and updates over WiFi: [FLASHING.md](FLASHING.md).
 
 ## First setup

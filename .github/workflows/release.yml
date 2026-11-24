@@ -35,8 +35,7 @@ jobs:
 
       - name: Build release
         env:
-          OUT_DIR: site
-          REPO: ${{ github.repository }}
+          OUT_DIR: build-out
         run: ./examples/companion_radio_bot/release.sh
 
       - name: Create GitHub release
@@ -49,7 +48,14 @@ jobs:
           gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes \
             --title "HelBot $VER" \
             --notes "Install from your browser: $PAGE. Binaries and checksums are attached. Update a running bot with firmware.bin through its /update page." \
-            site/firmware-merged.bin site/firmware.bin site/SHA256SUMS
+            build-out/firmware-merged.bin build-out/firmware.bin build-out/firmware-update.bin build-out/SHA256SUMS
+
+      - name: Assemble install site
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PREVIOUS: '3'
+        run: ./examples/companion_radio_bot/site.sh site build-out
 
       - uses: actions/upload-pages-artifact@v3
         with:

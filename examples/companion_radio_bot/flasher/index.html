@@ -4,27 +4,32 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HelBot installer</title>
-<meta name="description" content="Install HelBot, an on-device MeshCore chat bot, on a Heltec WiFi LoRa 32 V4 from your browser.">
+<meta name="description" content="Install or update HelBot, an on-device MeshCore chat bot, on a Heltec WiFi LoRa 32 V4 from your browser.">
 <style>
-  :root { color-scheme: light dark; --bg:#ffffff; --fg:#1b1f24; --mut:#566270; --card:#f4f6f8; --line:#d3dae1; --acc:#1f6feb; --warn:#b7791f; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#0f1317; --fg:#e6eaee; --mut:#9aa5b1; --card:#171d23; --line:#2a323a; --acc:#4c8dff; --warn:#e0a53a; } }
+  :root { color-scheme: light dark; --bg:#ffffff; --fg:#1b1f24; --mut:#566270; --card:#f4f6f8; --line:#d3dae1; --acc:#1f6feb; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1317; --fg:#e6eaee; --mut:#9aa5b1; --card:#171d23; --line:#2a323a; --acc:#4c8dff; } }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; }
   main { max-width:720px; margin:0 auto; padding:28px 16px 56px; }
   h1 { margin:0 0 4px; font-size:1.8rem; line-height:1.2; }
-  h2 { margin:32px 0 8px; font-size:1.2rem; }
+  h2 { margin:30px 0 8px; font-size:1.2rem; }
   a { color:var(--acc); }
   .mut { color:var(--mut); }
-  .ver { display:inline-block; margin-left:8px; padding:1px 9px; font-size:.85rem; border:1px solid var(--line); border-radius:99px; color:var(--mut); vertical-align:middle; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin:14px 0; }
+  fieldset { border:0; padding:0; margin:0 0 14px; min-width:0; }
+  legend { font-weight:600; margin-bottom:6px; padding:0; }
+  .opt { display:block; padding:6px 0; cursor:pointer; }
+  .opt input { margin-right:8px; }
+  .opt small { display:block; margin-left:26px; color:var(--mut); }
+  select { font:inherit; padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--fg); max-width:100%; }
   ol, ul { padding-left:1.3em; margin:8px 0; } li { margin:7px 0; }
   code, pre { font:.9em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
   code { background:var(--bg); border:1px solid var(--line); border-radius:4px; padding:0 4px; overflow-wrap:anywhere; }
   pre { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; overflow-x:auto; margin:8px 0; }
   pre code { border:0; padding:0; }
-  esp-web-install-button button { font:inherit; font-weight:600; padding:12px 22px; border-radius:10px; border:0; background:var(--acc); color:#fff; cursor:pointer; }
-  .dl { display:flex; flex-wrap:wrap; gap:8px 14px; list-style:none; padding:0; }
-  .dl li { margin:0; }
+  .btn, esp-web-install-button button { display:inline-block; font:inherit; font-weight:600; padding:12px 22px; border-radius:10px; border:0; background:var(--acc); color:#fff; cursor:pointer; text-decoration:none; }
+  #summary { margin:0 0 12px; }
+  [hidden] { display:none !important; }
   summary { cursor:pointer; font-weight:600; }
   details { margin:8px 0; }
   footer { margin-top:36px; font-size:.9rem; }
@@ -32,73 +37,167 @@
 </head>
 <body>
 <main>
-  <h1>HelBot <span class="ver">v@VERSION@</span></h1>
+  <h1>HelBot <span class="mut" id="verlabel"></span></h1>
   <p class="mut">A MeshCore chat bot that runs on the radio itself: <code>ping</code>, <code>path</code>, <code>wx</code>, <code>sun</code> and more, with no computer or server.
   For the <b>Heltec WiFi LoRa 32 V4</b> only.</p>
 
   <div class="card">
-    <esp-web-install-button manifest="manifest.json">
-      <span slot="unsupported">This browser can't flash over USB. Use Chrome, Edge or Opera on a computer, or the esptool steps below.</span>
-      <span slot="not-allowed">Flashing needs this page to be opened over HTTPS.</span>
-    </esp-web-install-button>
-    <p class="mut" style="margin:10px 0 0">Plug the board in with a USB <b>data</b> cable first. Installing replaces the firmware on the board.</p>
+    <fieldset>
+      <legend>What do you want to do?</legend>
+      <label class="opt"><input type="radio" name="mode" value="new" checked> New install
+        <small>A board that doesn't run HelBot yet, or a clean start. Erases settings.</small></label>
+      <label class="opt"><input type="radio" name="mode" value="update"> Update a bot that is already running
+        <small>Keeps its name, WiFi and settings.</small></label>
+    </fieldset>
+
+    <fieldset id="how" hidden>
+      <legend>How?</legend>
+      <label class="opt"><input type="radio" name="how" value="wifi" checked> Over WiFi, no cable
+        <small>Download the file and upload it on the bot's own update page.</small></label>
+      <label class="opt"><input type="radio" name="how" value="usb"> Over USB
+        <small id="usbnote">Plug the board into this computer.</small></label>
+    </fieldset>
+
+    <fieldset id="verbox" hidden>
+      <legend><label for="ver">Version</label></legend>
+      <select id="ver"></select>
+      <small class="mut" id="vernote"></small>
+    </fieldset>
+
+    <p id="summary" class="mut"></p>
+
+    <div id="act-flash" hidden>
+      <esp-web-install-button manifest="" id="flashbtn">
+        <span slot="unsupported">This browser can't flash over USB. Use Chrome, Edge or Opera on a computer, or the esptool steps further down.</span>
+        <span slot="not-allowed">Flashing needs this page to be opened over HTTPS.</span>
+      </esp-web-install-button>
+      <p class="mut" style="margin:10px 0 0">Plug the board in with a USB <b>data</b> cable first.</p>
+    </div>
+
+    <div id="act-wifi" hidden>
+      <a class="btn" id="dlbtn" href="#" download>Download firmware.bin</a>
+      <p class="mut" style="margin:10px 0 0">Then follow these steps:</p>
+      <ol>
+        <li>On a phone or computer on the same WiFi as the bot, open its address from the board's screen with <code>/update</code> on the end, for example <code>http://192.168.1.50/update</code>.</li>
+        <li>Log in with user <code>admin</code> and your web password.</li>
+        <li>Choose the <code>firmware.bin</code> file you just downloaded and upload it.</li>
+        <li>Wait about a minute while the bot restarts, then check the version on its status page.</li>
+      </ol>
+    </div>
+
+    <noscript><p>JavaScript is needed to pick a version. Files for every version are on the
+      <a href="https://github.com/@REPO@/releases">releases page</a>.</p></noscript>
   </div>
 
-  <h2>1. Install</h2>
-  <ol>
-    <li>Press <b>Install</b> above and pick the board's serial port.</li>
-    <li>If the port isn't listed, or flashing won't start: hold <b>BOOT</b>, tap <b>RST</b>, release <b>BOOT</b>, then try again.</li>
-    <li>Wait for it to finish (about a minute). The board restarts by itself.</li>
-  </ol>
+  <div id="guide-new">
+    <h2>After flashing: connect it to your WiFi</h2>
+    <ol>
+      <li>Power the board from a <b>charger or power bank</b>; some computers hold it in the bootloader. Press <b>RST</b> if it doesn't restart by itself.</li>
+      <li>With no WiFi saved, it opens a network called <code>MeshBot-XXXXXX</code>. The password is shown on the board's screen. Join it from your phone and the setup page opens by itself.</li>
+      <li>Choose your WiFi network and set a <b>web password</b> for the bot. The board restarts, joins your WiFi and shows its address on the screen.</li>
+    </ol>
 
-  <h2>2. Connect it to your WiFi</h2>
-  <ol>
-    <li>Power the board from a <b>charger or power bank</b>. Some computers hold it in the bootloader.</li>
-    <li>With no WiFi saved, it opens a network called <code>MeshBot-XXXXXX</code>. The password is shown on the board's screen. Join it from your phone and the setup page opens by itself.</li>
-    <li>Choose your WiFi network and set a <b>web password</b> for the bot. The board restarts, joins your WiFi and shows its address on the screen.</li>
-  </ol>
+    <h2>Set it up</h2>
+    <ol>
+      <li>Open the board's address in a browser and log in with user <code>admin</code> and your web password.</li>
+      <li>On <b>Settings</b>: choose the bot's name, your location and UTC offset (for <code>sun</code>, <code>moon</code> and <code>wx</code>), the channels it answers on, and which commands are on. Save, then restart.</li>
+      <li>In the MeshCore app, connect to the board like any companion radio, set your region's radio settings, and join the channel the bot should answer on.</li>
+      <li>Send <code>ping</code> on that channel. The bot answers <code>pong</code>.</li>
+    </ol>
 
-  <h2>3. Set it up</h2>
-  <ol>
-    <li>Open the board's address in a browser and log in with user <code>admin</code> and your web password.</li>
-    <li>On <b>Settings</b>: choose the bot's name, your location and UTC offset (for <code>sun</code>, <code>moon</code> and <code>wx</code>), the channels it answers on, and which commands are on. Press save, then restart.</li>
-    <li>In the MeshCore app, connect to the board like any companion radio, set your region's radio settings, and join the channel the bot should answer on.</li>
-    <li>Send <code>ping</code> on that channel. The bot answers <code>pong</code>.</li>
-  </ol>
-
-  <h2>MQTT observer (optional, off by default)</h2>
-  <p>The bot can publish the packets it hears to a MeshCore analyzer. It stays off until you pick a broker <b>and</b> enter your IATA location code (a nearby airport code) on the Settings page, then restart.
-  The community brokers are shared, volunteer-run infrastructure: use your own region's code and follow the operators' rules.</p>
-
-  <h2>Updating later</h2>
-  <p>No cable needed. Download <code>firmware.bin</code> below, open <code>http://&lt;board address&gt;/update</code>, log in and upload it. The board restarts into the new version; the version is shown on the status page.</p>
+    <h2>MQTT observer (optional, off by default)</h2>
+    <p>The bot can publish the packets it hears to a MeshCore analyzer. It stays off until you pick a broker <b>and</b> enter your IATA location code (a nearby airport code) on the Settings page, then restart.
+    The community brokers are shared, volunteer-run infrastructure: use your own region's code and follow the operators' rules.</p>
+  </div>
 
   <h2>Troubleshooting</h2>
-  <details><summary>The port isn't listed, or it stays on the bootloader</summary>
-    Use a data cable (not charge-only), try another USB port, and use BOOT + RST as in step 1. After flashing, power the board from a charger instead of the computer.</details>
+  <details><summary>The port isn't listed, or flashing won't start</summary>
+    Use a data cable (not charge-only) and try another USB port. Then hold <b>BOOT</b>, tap <b>RST</b>, release <b>BOOT</b>, and try again.</details>
   <details><summary>I forgot the WiFi or want to switch networks</summary>
     Hold the BOOT button for 10 seconds. That wipes the saved WiFi (the web password stays) and the board opens its setup network again.</details>
   <details><summary>I can't reach the settings page</summary>
     Use the address shown on the board's screen. Your computer must be on the same WiFi. If the board can't join its network for three minutes after a restart, it falls back to the setup network.</details>
   <details><summary>The bot doesn't answer</summary>
     Check that the channel is in the allow-list on the Settings page, that the command is on, and that the radio settings match your mesh. The bot rate-limits its replies on purpose.</details>
-
-  <h2>Downloads</h2>
-  <ul class="dl">
-    <li><a href="firmware-merged.bin">firmware-merged.bin</a> (first install, flash at 0x0)</li>
-    <li><a href="firmware.bin">firmware.bin</a> (update over WiFi)</li>
-    <li><a href="SHA256SUMS">SHA256SUMS</a></li>
-    <li><a href="https://github.com/@REPO@/releases">All releases</a></li>
-  </ul>
-  <p>With esptool instead of the browser:</p>
-  <pre><code>pip install esptool
-esptool.py --chip esp32s3 --port &lt;port&gt; --baud 921600 write_flash 0x0 firmware-merged.bin</code></pre>
+  <details><summary>I'd rather use esptool</summary>
+    Files and checksums for each version are on the <a href="https://github.com/@REPO@/releases">releases page</a>.
+    <pre><code>pip install esptool
+# new install (erases settings)
+esptool.py --chip esp32s3 --port &lt;port&gt; --baud 921600 write_flash 0x0 firmware-merged.bin
+# update over USB (keeps settings)
+esptool.py --chip esp32s3 --port &lt;port&gt; --baud 921600 write_flash 0xe000 firmware-update.bin</code></pre></details>
 
   <footer class="mut">
     Open source (MIT) under <a href="https://github.com/@REPO@">@REPO@</a>. Built on <a href="https://github.com/meshcore-dev/MeshCore">MeshCore</a>;
     other work used, with licences, is in <a href="https://github.com/@REPO@/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>.
   </footer>
 </main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var versions = [];
+  function val(name) { return document.querySelector('input[name="' + name + '"]:checked').value; }
+  function cur() { return versions.filter(function (v) { return v.version === $('ver').value; })[0]; }
+
+  function render() {
+    var v = cur(); if (!v) return;
+    var mode = val('mode');
+    var how = mode === 'update' ? val('how') : null;
+    $('how').hidden = mode !== 'update';
+
+    // USB update needs the update image, which only some versions have.
+    var usbOpt = document.querySelector('input[name="how"][value="usb"]');
+    usbOpt.disabled = !v.usb_update;
+    if (!v.usb_update && how === 'usb') {
+      document.querySelector('input[name="how"][value="wifi"]').checked = true;
+      how = 'wifi';
+    }
+    $('usbnote').textContent = v.usb_update
+      ? 'Plug the board into this computer.'
+      : 'Not available for this version. Use WiFi, or pick a newer version.';
+
+    var flash = mode === 'new' || how === 'usb';
+    $('act-flash').hidden = !flash;
+    $('act-wifi').hidden = flash;
+    $('guide-new').hidden = mode !== 'new';
+
+    if (flash) {
+      $('flashbtn').setAttribute('manifest', v.version + '/manifest-' + (mode === 'new' ? 'install' : 'update') + '.json');
+    } else {
+      $('dlbtn').href = v.version + '/firmware.bin';
+      $('dlbtn').textContent = 'Download firmware.bin v' + v.version;
+    }
+    $('summary').textContent =
+      mode === 'new' ? 'Installs HelBot v' + v.version + ' on the board and erases its settings.'
+      : how === 'usb' ? 'Updates the board to HelBot v' + v.version + ' over USB and keeps its settings.'
+      : 'Gets firmware.bin for HelBot v' + v.version + ', which you upload on the bot’s update page. Settings are kept.';
+    $('verlabel').textContent = 'v' + v.version;
+    $('vernote').textContent = v.latest ? '' : '  An older version, for rolling back.';
+  }
+
+  function init(list) {
+    versions = list;
+    var sel = $('ver');
+    list.forEach(function (v) {
+      var o = document.createElement('option');
+      o.value = v.version; o.textContent = 'v' + v.version + (v.latest ? ' (latest)' : '');
+      sel.appendChild(o);
+    });
+    $('verbox').hidden = list.length < 2;
+    Array.prototype.forEach.call(document.querySelectorAll('input[name="mode"],input[name="how"],#ver'),
+      function (e) { e.addEventListener('change', render); });
+    render();
+  }
+
+  fetch('versions.json', { cache: 'no-cache' })
+    .then(function (r) { return r.json(); })
+    .then(init)
+    .catch(function () {
+      $('summary').textContent = 'Could not load the version list. Reload the page, or use the releases page.';
+    });
+})();
+</script>
 <script type="module" src="https://unpkg.com/esp-web-tools@10.0.1/dist/web/install-button.js?module"></script>
 </body>
 </html>

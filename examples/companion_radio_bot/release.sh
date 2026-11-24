@@ -2,10 +2,11 @@
 # Build a distributable release into out/release/<version>/ :
 #   firmware-merged.bin  full image for first install (flash at 0x0)
 #   firmware.bin         app image for OTA updates (web UI /update)
-#   manifest.json + index.html   browser installer (serve over HTTPS)
+#   firmware-update.bin  USB update image (flash at 0xe000): boot_app0 + app, keeps
+#                        NVS settings and the filesystem, resets the OTA slot to app0
 #   SHA256SUMS
-# Env: PIO (pio binary), OUT_DIR (override output folder), REPO (owner/name shown
-# on the page, default codemonkeybr/meshcore-heltec-bot).
+# site.sh turns these into the browser installer page.
+# Env: PIO (pio binary), OUT_DIR (override output folder).
 # Builds with platformio.local.ini hidden so no WiFi password, location or other
 # local settings can end up in the binary.
 set -euo pipefail
@@ -15,7 +16,6 @@ ENV=heltec_v4_companion_radio_bot
 VER=$(sed -n 's/^#define BOT_VERSION "\(.*\)"/\1/p' examples/companion_radio_bot/BotConfig.h)
 [ -n "$VER" ] || { echo "cannot read BOT_VERSION"; exit 1; }
 OUT=${OUT_DIR:-out/release/$VER}
-REPO=${REPO:-codemonkeybr/meshcore-heltec-bot}
 
 # A release tag must match the firmware version.
 TAG=$(git describe --tags --exact-match 2>/dev/null || true)
@@ -41,18 +41,12 @@ B=.pio/build/$ENV
 mkdir -p "$OUT"
 cp $B/firmware-merged.bin "$OUT/firmware-merged.bin"
 cp $B/firmware.bin "$OUT/firmware.bin"
-sed -e "s#@VERSION@#$VER#g" -e "s#@REPO@#$REPO#g" examples/companion_radio_bot/flasher/index.html > "$OUT/index.html"
-cat > "$OUT/manifest.json" <<JSON
-{
-  "name": "HelBot",
-  "version": "$VER",
-  "new_install_prompt_erase": false,
-  "builds": [
-    { "chipFamily": "ESP32-S3", "parts": [ { "path": "firmware-merged.bin", "offset": 0 } ] }
-  ]
-}
-JSON
-(cd "$OUT" && sha256sum firmware-merged.bin firmware.bin > SHA256SUMS)
+# boot_app0.bin is exactly the 0x2000-byte otadata slot (0xe000..0x10000) and the app
+# starts at 0x10000, so the two concatenate into one contiguous image.
+BOOT_APP0="${PLATFORMIO_CORE_DIR:-$HOME/.platformio}/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin"
+[ "$(stat -c %s "$BOOT_APP0")" -eq 8192 ] || { echo "unexpected boot_app0.bin size"; exit 1; }
+cat "$BOOT_APP0" "$OUT/firmware.bin" > "$OUT/firmware-update.bin"
+(cd "$OUT" && sha256sum firmware-merged.bin firmware.bin firmware-update.bin > SHA256SUMS)
 
 # Guard: nothing from a local config may be in the image.
 if [ -f "$HOLD" ]; then
